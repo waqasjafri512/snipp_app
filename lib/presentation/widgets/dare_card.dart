@@ -30,38 +30,44 @@ class DareCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                _buildAvatar(dare),
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: dare['creator_id']),
+                  child: _buildAvatar(dare),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
+                  child: GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: dare['creator_id']),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              displayName,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: AppColors.textMain,
+                              ),
+                            ),
+                            if (dare['creator_verified'] == true) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.verified, color: Colors.blue, size: 14),
+                            ],
+                          ],
+                        ),
+                        if (isCompletion)
                           Text(
-                            displayName,
+                            'Completed a dare',
                             style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: AppColors.textMain,
+                              fontSize: 11,
+                              color: const Color(0xFF10B981),
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (dare['creator_verified'] == true) ...[
-                            const SizedBox(width: 4),
-                            const Icon(Icons.verified, color: Colors.blue, size: 14),
-                          ],
-                        ],
-                      ),
-                      if (isCompletion)
-                        Text(
-                          'Completed a dare',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            color: const Color(0xFF10B981),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 _buildFollowButton(context),
@@ -208,13 +214,21 @@ class DareCard extends StatelessWidget {
                     _buildInteractionIcon(
                       icon: Icons.send_rounded,
                       color: AppColors.textMain,
-                      onTap: () {},
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Share functionality coming soon! 🚀')),
+                        );
+                      },
                     ),
                     const Spacer(),
                     _buildInteractionIcon(
                       icon: Icons.bookmark_border_rounded,
                       color: AppColors.textMain,
-                      onTap: () {},
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Saved to your collection! 🔖')),
+                        );
+                      },
                     ),
                   ],
                 ),

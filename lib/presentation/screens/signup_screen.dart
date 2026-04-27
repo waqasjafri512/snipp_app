@@ -29,6 +29,9 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _handleSignup() async {
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    if (authProv.isLoading) return;
+
     final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final fullName = _fullNameController.text.trim();
@@ -41,7 +44,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    final authProv = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProv.register(
       username: username,
       email: email,

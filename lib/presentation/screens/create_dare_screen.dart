@@ -50,7 +50,11 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
   }
 
   void _handleSubmit() async {
+    if (_isUploading) return; // Prevent duplicate clicks
+    
     if (_formKey.currentState!.validate()) {
+      setState(() => _isUploading = true);
+      
       final dareProv = Provider.of<DareProvider>(context, listen: false);
       final authProv = Provider.of<AuthProvider>(context, listen: false);
       
@@ -63,22 +67,27 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
         'emoji': _getEmojiForCategory(_categories[_selCatIdx]),
       };
 
-      final bool success;
-      if (widget.existingDare != null) {
-        success = await dareProv.updateDare(widget.existingDare!['id'], dareData);
-      } else {
-        success = await dareProv.createDare(dareData, authProv.user);
-      }
+      try {
+        final bool success;
+        if (widget.existingDare != null) {
+          success = await dareProv.updateDare(widget.existingDare!['id'], dareData);
+        } else {
+          success = await dareProv.createDare(dareData, authProv.user);
+        }
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.existingDare != null ? 'Dare updated! 💫' : 'Dare posted! Let the games begin 🔥')),
-        );
-        Navigator.pop(context);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(dareProv.error ?? 'Failed to process dare')),
-        );
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(widget.existingDare != null ? 'Dare updated! 💫' : 'Dare posted! Let the games begin 🔥')),
+          );
+          Navigator.pop(context);
+        } else if (mounted) {
+          setState(() => _isUploading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(dareProv.error ?? 'Failed to process dare')),
+          );
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isUploading = false);
       }
     }
   }
@@ -374,8 +383,8 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
                       children: [
                         Expanded(
                           child: GradientButton(
-                            text: '🚀 Post Dare',
-                            onPressed: _handleSubmit,
+                            text: _isUploading ? 'Posting...' : '🚀 Post Dare',
+                            onPressed: _isUploading ? null : _handleSubmit,
                             borderRadius: 20,
                             height: 60,
                           ),

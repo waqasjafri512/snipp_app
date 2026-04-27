@@ -16,6 +16,7 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
   final _commentController = TextEditingController();
   int? _replyToCommentId;
   String? _replyToUsername;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -31,17 +32,24 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
 
   void _submitComment() async {
     final content = _commentController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
 
     final success = await Provider.of<DareProvider>(context, listen: false)
         .addComment(widget.dareId, content, parentId: _replyToCommentId);
     
     if (success) {
       _commentController.clear();
-      setState(() {
-        _replyToCommentId = null;
-        _replyToUsername = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _replyToCommentId = null;
+          _replyToUsername = null;
+        });
+      }
+    } else {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -180,11 +188,14 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
+                        gradient: _isSubmitting ? null : AppColors.primaryGradient,
+                        color: _isSubmitting ? Colors.grey[300] : null,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: Alignment.center,
-                      child: const Text('→', style: TextStyle(color: Colors.white, fontSize: 18)),
+                      child: _isSubmitting 
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('→', style: TextStyle(color: Colors.white, fontSize: 18)),
                     ),
                   ),
                 ],

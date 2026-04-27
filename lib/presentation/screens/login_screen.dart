@@ -25,6 +25,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    if (authProv.isLoading) return;
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -35,7 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final authProv = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProv.login(email, password);
 
     if (success && mounted) {
