@@ -10,7 +10,7 @@
 *   **Live Streaming**: Low-latency video streaming powered by Agora.
 *   **Stories**: 24-hour disappearing moments with professional viewing and management.
 *   **Premium Design**: Custom-built UI using Google Fonts (Bricolage Grotesque & Plus Jakarta Sans), smooth gradients, and micro-animations.
-*   **Secure Auth**: JWT-based authentication with a professional onboarding flow.
+*   **Secure Auth**: Firebase Authentication for secure login, registration, and email verification.
 
 ## 📸 UI Gallery
 
@@ -20,6 +20,7 @@
 ## 🛠 Tech Stack
 
 *   **Framework**: [Flutter](https://flutter.dev) (v3.10+)
+*   **Auth**: Firebase Auth
 *   **State Management**: Provider
 *   **Networking**: Http & Socket.io Client
 *   **Real-time**: Socket.io
@@ -33,6 +34,7 @@
 
 *   Flutter SDK (v3.0.0 or higher)
 *   Dart SDK (v3.0.0 or higher)
+*   Firebase Project
 *   A running instance of the [Snipp Backend](https://github.com/your-username/snipp-backend)
 
 ### Installation
@@ -48,7 +50,11 @@
     flutter pub get
     ```
 
-3.  **Configure API URL**:
+3.  **Firebase Setup**:
+    -   Option A (Recommended): Run `flutterfire configure` and select your project.
+    -   Option B (Manual): Download `google-services.json` from Firebase Console and place it in `android/app/`.
+
+4.  **Configure API URL**:
     Open `lib/core/constants/app_constants.dart` and ensure the `apiUrl` points to your backend:
     ```dart
     static const String apiUrl = 'https://your-backend-url.com/api';

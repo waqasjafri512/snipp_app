@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,7 +28,20 @@ import 'presentation/screens/viewer_screen.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/theme_center_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp();
+    print('Firebase initialized successfully.');
+  } catch (e) {
+    print('\n======================================================');
+    print('🚨 FIREBASE NOT CONFIGURED YET!');
+    print('You need to run "flutterfire configure" in your terminal.');
+    print('The app will likely crash or fail to login until you do.');
+    print('======================================================\n');
+  }
+
   runApp(
     MultiProvider(
       providers: [

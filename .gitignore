@@ -78,3 +78,7 @@ DerivedData/
 !/ios/Runner/Info.plist
 !/ios/Runner/Base.lproj/LaunchScreen.storyboard
 !/ios/Runner/Base.lproj/Main.storyboard
+
+# Firebase
+lib/firebase_options.dart
+ios/Runner/GoogleService-Info.plist

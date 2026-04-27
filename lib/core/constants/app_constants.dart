@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 class AppConstants {
   static const String appName = 'Snipp';
-  // static const String apiUrl = 'https://snipp-backend.vercel.app/api'; // Production Vercel Link
-  static const String apiUrl = 'http://192.168.1.168:5000/api';
+  static const String apiUrl = 'https://snipp-backend.vercel.app/api'; // Production Vercel Link
+  // static const String apiUrl = 'http://192.168.1.168:5000/api';
   // Storage keys
   static const String tokenKey = 'jwt_token';
   static const String userKey = 'current_user';
