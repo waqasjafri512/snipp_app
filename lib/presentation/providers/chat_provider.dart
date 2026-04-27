@@ -19,8 +19,11 @@ class ChatProvider with ChangeNotifier {
         // If the message is with the current active chat user, add it to messages
         if (_activeChatUserId != null && 
             (message['sender_id'] == _activeChatUserId || message['receiver_id'] == _activeChatUserId)) {
-          _messages.insert(0, message);
-          notifyListeners();
+          final exists = _messages.any((m) => m['id'] == message['id']);
+          if (!exists) {
+            _messages.insert(0, message);
+            notifyListeners();
+          }
         }
         
         // Update conversations list

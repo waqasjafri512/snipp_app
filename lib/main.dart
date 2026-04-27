@@ -23,6 +23,8 @@ import 'presentation/screens/chat_list_screen.dart';
 import 'presentation/screens/chat_detail_screen.dart';
 import 'presentation/screens/broadcaster_screen.dart';
 import 'presentation/screens/viewer_screen.dart';
+import 'presentation/providers/theme_provider.dart';
+import 'presentation/screens/theme_center_screen.dart';
 
 void main() {
   runApp(
@@ -36,6 +38,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => LiveProvider()),
         ChangeNotifierProvider(create: (_) => StoryProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -49,119 +52,80 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      scaffoldMessengerKey: messengerKey,
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        primaryColor: AppColors.primaryStart,
-        scaffoldBackgroundColor: AppColors.background,
-        textTheme: GoogleFonts.plusJakartaSansTextTheme().copyWith(
-          displayLarge: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w800,
-            color: AppColors.textMain,
-          ),
-          displayMedium: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w800,
-            color: AppColors.textMain,
-          ),
-          displaySmall: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w800,
-            color: AppColors.textMain,
-          ),
-          headlineMedium: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textMain,
-          ),
-          titleLarge: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textMain,
-          ),
-        ),
-        colorScheme: ColorScheme.light(
-          primary: AppColors.primaryStart,
-          secondary: AppColors.accent,
-          surface: AppColors.cardBg,
-          onSurface: AppColors.textMain,
-          onPrimary: Colors.white,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: GoogleFonts.bricolageGrotesque(
-            color: AppColors.textMain,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-          ),
-          iconTheme: const IconThemeData(color: AppColors.textMain),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            elevation: 8,
-            backgroundColor: AppColors.primaryStart,
-            foregroundColor: Colors.white,
-            shadowColor: AppColors.primaryStart.withOpacity(0.35),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final currentTheme = themeProv.currentTheme;
+        
+        return MaterialApp(
+          scaffoldMessengerKey: messengerKey,
+          title: AppConstants.appName,
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: themeProv.currentThemeIndex == 1 ? Brightness.dark : Brightness.light,
+            primaryColor: currentTheme.primaryStart,
+            scaffoldBackgroundColor: currentTheme.background,
+            textTheme: GoogleFonts.plusJakartaSansTextTheme().copyWith(
+              displayLarge: GoogleFonts.bricolageGrotesque(
+                fontWeight: FontWeight.w800,
+                color: currentTheme.textMain,
+              ),
+              displayMedium: GoogleFonts.bricolageGrotesque(
+                fontWeight: FontWeight.w800,
+                color: currentTheme.textMain,
+              ),
+              displaySmall: GoogleFonts.bricolageGrotesque(
+                fontWeight: FontWeight.w800,
+                color: currentTheme.textMain,
+              ),
+              headlineMedium: GoogleFonts.bricolageGrotesque(
+                fontWeight: FontWeight.w700,
+                color: currentTheme.textMain,
+              ),
+              titleLarge: GoogleFonts.bricolageGrotesque(
+                fontWeight: FontWeight.w700,
+                color: currentTheme.textMain,
+              ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            textStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: currentTheme.primaryStart,
+              brightness: themeProv.currentThemeIndex == 1 ? Brightness.dark : Brightness.light,
+              primary: currentTheme.primaryStart,
+              secondary: currentTheme.primaryEnd,
+              surface: themeProv.currentThemeIndex == 1 ? const Color(0xFF1A1A1A) : Colors.white,
+            ),
+            appBarTheme: AppBarTheme(
+              backgroundColor: currentTheme.background,
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: GoogleFonts.bricolageGrotesque(
+                color: currentTheme.textMain,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+              iconTheme: IconThemeData(color: currentTheme.textMain),
             ),
           ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF2EFFF),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: AppColors.primaryStart, width: 2),
-          ),
-          hintStyle: GoogleFonts.plusJakartaSans(
-            color: const Color(0xFF9CA3AF),
-            fontSize: 14,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          color: AppColors.cardBg,
-          elevation: 2,
-          shadowColor: AppColors.primaryStart.withOpacity(0.07),
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-      ),
-      home: const SplashScreen(),
-      routes: {
-        AppConstants.loginRoute: (context) => const LoginScreen(),
-        AppConstants.signupRoute: (context) => const SignupScreen(),
-        AppConstants.homeRoute: (context) => const HomeScreen(),
-        AppConstants.profileRoute: (context) => const ProfileScreen(),
-        AppConstants.createDareRoute: (context) => const CreateDareScreen(),
-        AppConstants.chatListRoute: (context) => const ChatListScreen(),
-        AppConstants.searchRoute: (context) => const SearchScreen(),
-        AppConstants.notificationsRoute: (context) => const NotificationsScreen(),
-        '/broadcaster': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-          return BroadcasterScreen(
-            channelName: args['channelName'],
-            title: args['title'],
-          );
-        },
+          home: const SplashScreen(),
+          routes: {
+            AppConstants.loginRoute: (context) => const LoginScreen(),
+            AppConstants.signupRoute: (context) => const SignupScreen(),
+            AppConstants.homeRoute: (context) => const HomeScreen(),
+            AppConstants.profileRoute: (context) => const ProfileScreen(),
+            AppConstants.createDareRoute: (context) => const CreateDareScreen(),
+            AppConstants.chatListRoute: (context) => const ChatListScreen(),
+            AppConstants.searchRoute: (context) => const SearchScreen(),
+            AppConstants.notificationsRoute: (context) => const NotificationsScreen(),
+            '/theme-center': (context) => const ThemeCenterScreen(),
+            '/broadcaster': (context) {
+              final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+              return BroadcasterScreen(
+                channelName: args['channelName'],
+                title: args['title'],
+              );
+            },
+          },
+        );
       },
     );
   }

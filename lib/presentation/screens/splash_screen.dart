@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -55,108 +56,113 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient,
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _floatAnimation,
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: Offset(0, _floatAnimation.value),
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 64,
-                            offset: const Offset(0, 24),
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        '⚡',
-                        style: TextStyle(fontSize: 50),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Snipp',
-                    style: GoogleFonts.bricolageGrotesque(
-                      fontSize: 52,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Dare. Complete. Repeat.',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white.withOpacity(0.72),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final theme = themeProv.currentTheme;
+
+        return Scaffold(
+          body: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: theme.gradient,
             ),
-            Positioned(
-              bottom: 56,
-              left: 0,
-              right: 0,
-              child: Column(
-                children: [
-                  Row(
+            child: Stack(
+              children: [
+                Center(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (i) => Container(
-                      width: i == 1 ? 24 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(4),
+                    children: [
+                      AnimatedBuilder(
+                        animation: _floatAnimation,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _floatAnimation.value),
+                            child: child,
+                          );
+                        },
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.35),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.18),
+                                blurRadius: 64,
+                                offset: const Offset(0, 24),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '⚡',
+                            style: TextStyle(fontSize: 50),
+                          ),
+                        ),
                       ),
-                    )),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Snipp',
+                        style: GoogleFonts.bricolageGrotesque(
+                          fontSize: 52,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Dare. Complete. Repeat.',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white.withOpacity(0.72),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'LOADING',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white.withOpacity(0.45),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 3,
-                    ),
+                ),
+                Positioned(
+                  bottom: 56,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (i) => Container(
+                          width: i == 1 ? 24 : 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        )),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'LOADING',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white.withOpacity(0.45),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 3,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
-

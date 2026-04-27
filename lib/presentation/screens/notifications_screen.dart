@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/notification_provider.dart';
+import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'profile_screen.dart';
 
@@ -41,105 +42,113 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryStart.withOpacity(0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Activity 🔔',
-                    style: GoogleFonts.bricolageGrotesque(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMain,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Provider.of<NotificationProvider>(context, listen: false).markAllAsRead(),
-                    child: Text(
-                      'Mark all as read',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: AppColors.primaryStart,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final theme = themeProv.currentTheme;
+        final isDark = themeProv.currentThemeIndex == 1;
+
+        return Scaffold(
+          backgroundColor: theme.background,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  decoration: BoxDecoration(
+                    color: theme.background,
+                    boxShadow: isDark ? null : [
+                      BoxShadow(
+                        color: theme.primaryStart.withOpacity(0.07),
+                        blurRadius: 14,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
+                    ],
+                    border: isDark ? const Border(bottom: BorderSide(color: Colors.white10)) : null,
                   ),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primaryStart,
-                onRefresh: () async {
-                  _currentPage = 1;
-                  await Provider.of<NotificationProvider>(context, listen: false).fetchNotifications(page: 1);
-                },
-                child: Consumer<NotificationProvider>(
-                  builder: (context, notifProv, child) {
-                    if (notifProv.isLoading && notifProv.notifications.isEmpty) {
-                      return const Center(child: CircularProgressIndicator(color: AppColors.primaryStart));
-                    }
-
-                    if (notifProv.notifications.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('🔔', style: TextStyle(fontSize: 40)),
-                            const SizedBox(height: 10),
-                            Text(
-                              'No activity yet',
-                              style: GoogleFonts.plusJakartaSans(color: AppColors.muted),
-                            ),
-                          ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Activity 🔔',
+                        style: GoogleFonts.bricolageGrotesque(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textMain,
                         ),
-                      );
-                    }
+                      ),
+                      TextButton(
+                        onPressed: () => Provider.of<NotificationProvider>(context, listen: false).markAllAsRead(),
+                        child: Text(
+                          'Mark all as read',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: theme.primaryStart,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      itemCount: notifProv.notifications.length + (notifProv.isLoading ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == notifProv.notifications.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
+                Expanded(
+                  child: RefreshIndicator(
+                    color: theme.primaryStart,
+                    onRefresh: () async {
+                      _currentPage = 1;
+                      await Provider.of<NotificationProvider>(context, listen: false).fetchNotifications(page: 1);
+                    },
+                    child: Consumer<NotificationProvider>(
+                      builder: (context, notifProv, child) {
+                        if (notifProv.isLoading && notifProv.notifications.isEmpty) {
+                          return Center(child: CircularProgressIndicator(color: theme.primaryStart));
+                        }
+
+                        if (notifProv.notifications.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('🔔', style: TextStyle(fontSize: 40)),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'No activity yet',
+                                  style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white54 : AppColors.muted),
+                                ),
+                              ],
+                            ),
                           );
                         }
-                        return _buildNotificationItem(context, notifProv.notifications[index]);
+
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          itemCount: notifProv.notifications.length + (notifProv.isLoading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == notifProv.notifications.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                child: Center(child: CircularProgressIndicator(color: theme.primaryStart)),
+                              );
+                            }
+                            return _buildNotificationItem(context, notifProv.notifications[index], theme, isDark);
+                          },
+                        );
                       },
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildNotificationItem(BuildContext context, Map<String, dynamic> notif) {
+  Widget _buildNotificationItem(BuildContext context, Map<String, dynamic> notif, AppTheme theme, bool isDark) {
     bool isUnread = notif['is_read'] == false;
     int idx = notif['actor_id'] % 5;
     
@@ -156,16 +165,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
+          boxShadow: isDark ? null : [
             BoxShadow(
-              color: AppColors.primaryStart.withOpacity(0.04),
+              color: theme.primaryStart.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
           ],
-          border: isUnread ? Border.all(color: AppColors.primaryStart.withOpacity(0.1), width: 1) : null,
+          border: isUnread ? Border.all(color: theme.primaryStart.withOpacity(0.1), width: 1) : null,
         ),
         child: Row(
           children: [
@@ -177,7 +186,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 children: [
                   RichText(
                     text: TextSpan(
-                      style: GoogleFonts.plusJakartaSans(fontSize: 13, color: AppColors.textMain, height: 1.4),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 13, color: theme.textMain, height: 1.4),
                       children: [
                         TextSpan(
                           text: notif['actor_username'] ?? 'User',
@@ -195,7 +204,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Text(
                     _getTimeAgo(notif['created_at']?.toString()),
                     style: GoogleFonts.plusJakartaSans(
-                      color: isUnread ? AppColors.primaryStart : AppColors.muted,
+                      color: isUnread ? theme.primaryStart : (isDark ? Colors.white54 : AppColors.muted),
                       fontSize: 11,
                       fontWeight: isUnread ? FontWeight.w700 : FontWeight.w500,
                     ),
@@ -207,8 +216,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               Container(
                 width: 10,
                 height: 10,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                decoration: BoxDecoration(
+                  gradient: theme.gradient,
                   shape: BoxShape.circle,
                 ),
               ),

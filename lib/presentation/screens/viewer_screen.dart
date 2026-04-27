@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/live_provider.dart';
 import '../providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/services/socket_service.dart';
 import 'dart:ui';
+import 'dart:async';
 
 class ViewerScreen extends StatefulWidget {
   final int broadcasterId;
@@ -26,11 +28,44 @@ class _ViewerScreenState extends State<ViewerScreen> {
   RtcEngine? _engine;
   bool _isJoined = false;
   int? _localUid;
+  
+  final List<Map<String, dynamic>> _messages = [];
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _chatScrollController = ScrollController();
+  StreamSubscription? _socketSub;
 
   @override
   void initState() {
     super.initState();
     _initAgora();
+    _initSocket();
+  }
+
+  void _initSocket() {
+    SocketService().emit('joinStream', widget.channelName);
+    _socketSub = SocketService().eventStream.listen((event) {
+      if (event['event'] == 'streamMessage') {
+        setState(() {
+          _messages.add(event['data']);
+          if (_messages.length > 50) _messages.removeAt(0);
+        });
+        _scrollToBottom();
+      } else if (event['event'] == 'streamReaction') {
+        // We could show a floating emoji animation here
+      }
+    });
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _initAgora() async {
@@ -74,10 +109,38 @@ class _ViewerScreenState extends State<ViewerScreen> {
     );
   }
 
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProv.user;
+
+    SocketService().emit('streamMessage', {
+      'channelName': widget.channelName,
+      'username': user?['username'] ?? 'Anonymous',
+      'avatar': user?['avatar_url'],
+      'message': text,
+    });
+
+    _messageController.clear();
+  }
+
+  void _sendReaction(String emoji) {
+    SocketService().emit('streamReaction', {
+      'channelName': widget.channelName,
+      'emoji': emoji,
+    });
+  }
+
   @override
   void dispose() {
+    _socketSub?.cancel();
+    SocketService().emit('leaveStream', widget.channelName);
     _engine?.leaveChannel();
     _engine?.release();
+    _messageController.dispose();
+    _chatScrollController.dispose();
     super.dispose();
   }
 
@@ -167,6 +230,41 @@ class _ViewerScreenState extends State<ViewerScreen> {
             ),
           ),
 
+          // Chat Messages Overlay
+          Positioned(
+            bottom: 110,
+            left: 20,
+            right: 100,
+            child: SizedBox(
+              height: 200,
+              child: ListView.builder(
+                controller: _chatScrollController,
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final msg = _messages[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${msg['username']}: ',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, shadows: [Shadow(blurRadius: 4)]),
+                        ),
+                        Expanded(
+                          child: Text(
+                            msg['message'],
+                            style: const TextStyle(color: Colors.white, fontSize: 13, shadows: [Shadow(blurRadius: 4)]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
           // Bottom Bar & Reactions
           Positioned(
             bottom: 40,
@@ -194,18 +292,27 @@ class _ViewerScreenState extends State<ViewerScreen> {
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             color: Colors.white.withOpacity(0.15),
-                            child: const Text(
-                              'Say something nice...',
-                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                            child: TextField(
+                              controller: _messageController,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              decoration: const InputDecoration(
+                                hintText: 'Say something nice...',
+                                hintStyle: TextStyle(color: Colors.white70),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
                             ),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    _buildGlassIconButton(Icons.share_rounded),
+                    GestureDetector(
+                      onTap: _sendMessage,
+                      child: _buildGlassIconButton(Icons.send_rounded),
+                    ),
                     const SizedBox(width: 12),
                     _buildGlassIconButton(Icons.favorite_rounded, color: const Color(0xFFFF006E)),
                   ],
@@ -221,20 +328,23 @@ class _ViewerScreenState extends State<ViewerScreen> {
   Widget _buildReactionChip(String emoji) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: 45,
-            height: 45,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+      child: GestureDetector(
+        onTap: () => _sendReaction(emoji),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              width: 45,
+              height: 45,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+              ),
+              child: Text(emoji, style: const TextStyle(fontSize: 22)),
             ),
-            child: Text(emoji, style: const TextStyle(fontSize: 22)),
           ),
         ),
       ),

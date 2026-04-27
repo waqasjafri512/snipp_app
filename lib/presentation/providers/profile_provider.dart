@@ -9,12 +9,16 @@ class ProfileProvider with ChangeNotifier {
   Map<String, dynamic>? _userProfile;
   List<dynamic> _userDares = [];
   List<dynamic> _participatedDares = [];
+  List<dynamic> _followersList = [];
+  List<dynamic> _followingList = [];
   String? _error;
 
   bool get isLoading => _isLoading;
   Map<String, dynamic>? get userProfile => _userProfile;
   List<dynamic> get userDares => _userDares;
   List<dynamic> get participatedDares => _participatedDares;
+  List<dynamic> get followersList => _followersList;
+  List<dynamic> get followingList => _followingList;
   String? get error => _error;
 
   void _setLoading(bool value) {
@@ -73,6 +77,40 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
+  // Fetch Followers
+  Future<void> fetchFollowers(int userId) async {
+    _setLoading(true);
+    _followersList = [];
+    try {
+      final response = await _apiService.get('/profile/$userId/followers');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        _followersList = data['data']['followers'];
+      }
+    } catch (e) {
+      print('Fetch followers error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Fetch Following
+  Future<void> fetchFollowing(int userId) async {
+    _setLoading(true);
+    _followingList = [];
+    try {
+      final response = await _apiService.get('/profile/$userId/following');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        _followingList = data['data']['following'];
+      }
+    } catch (e) {
+      print('Fetch following error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Upload Avatar
   Future<bool> uploadAvatar(String filePath) async {
     _setLoading(true);
@@ -109,6 +147,7 @@ class ProfileProvider with ChangeNotifier {
       if (response.statusCode == 200 && data['success']) {
         _userProfile = data['data']['profile'];
         _setLoading(false);
+        notifyListeners();
         return true;
       } else {
         _error = data['message'] ?? 'Failed to update profile';

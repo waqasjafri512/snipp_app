@@ -9,12 +9,14 @@ class SearchProvider with ChangeNotifier {
   List<dynamic> _searchResultsUsers = [];
   List<dynamic> _searchResultsDares = [];
   List<dynamic> _trendingDares = [];
+  List<dynamic> _trendingUsers = [];
   String? _error;
 
   bool get isLoading => _isLoading;
   List<dynamic> get searchResultsUsers => _searchResultsUsers;
   List<dynamic> get searchResultsDares => _searchResultsDares;
   List<dynamic> get trendingDares => _trendingDares;
+  List<dynamic> get trendingUsers => _trendingUsers;
   String? get error => _error;
 
   void _setLoading(bool value) {
@@ -64,6 +66,21 @@ class SearchProvider with ChangeNotifier {
       print('Trending error: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Get Trending Creators
+  Future<void> fetchTrendingCreators() async {
+    try {
+      final response = await _apiService.get('/search/trending/creators');
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success']) {
+        _trendingUsers = data['data']['users'];
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Trending creators error: $e');
     }
   }
 }

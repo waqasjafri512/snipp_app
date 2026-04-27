@@ -6,6 +6,7 @@ import '../providers/live_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/story_provider.dart';
 import '../providers/notification_provider.dart';
+import '../providers/theme_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/dare_card.dart';
 import '../../core/constants/app_constants.dart';
@@ -45,7 +46,33 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _pickStoryMedia() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Story', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final file = await picker.pickImage(source: source, imageQuality: 80);
     
     if (file != null && mounted) {
       final success = await Provider.of<StoryProvider>(context, listen: false).uploadStory(file.path);
@@ -72,205 +99,215 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async {
-            _currentPage = 1;
-            await Provider.of<DareProvider>(context, listen: false).fetchFeed(page: 1);
-            await Provider.of<StoryProvider>(context, listen: false).fetchStories();
-          },
-          child: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              // Sticky Header
-              SliverToBoxAdapter(
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final currentTheme = themeProv.currentTheme;
+        
+        return Scaffold(
+          backgroundColor: currentTheme.background,
+          body: SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _currentPage = 1;
+                await Provider.of<DareProvider>(context, listen: false).fetchFeed(page: 1);
+                await Provider.of<StoryProvider>(context, listen: false).fetchStories();
+              },
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  // Sticky Header
+                  SliverToBoxAdapter(
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Consumer<AuthProvider>(
-                                  builder: (context, authProv, _) {
-                                    final name = authProv.user?['full_name']?.split(' ')[0] ?? 'User';
-                                    return Text(
-                                      'Hey $name! 👋',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 12,
-                                        color: AppColors.muted,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                Text(
-                                  'Explore Dares',
-                                  style: GoogleFonts.bricolageGrotesque(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textMain,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              _buildHeaderIconButton(
-                                Icons.search_rounded,
-                                onTap: () => Navigator.pushNamed(context, AppConstants.searchRoute),
-                              ),
-                              const SizedBox(width: 8),
-                              Consumer<NotificationProvider>(
-                                builder: (context, notifProv, _) => _buildHeaderIconButton(
-                                  Icons.notifications_none_rounded,
-                                  hasNotification: notifProv.unreadCount > 0,
-                                  onTap: () => Navigator.pushNamed(context, AppConstants.notificationsRoute),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Consumer<AuthProvider>(
+                                      builder: (context, authProv, _) {
+                                        final name = authProv.user?['full_name']?.split(' ')[0] ?? 'User';
+                                        return Text(
+                                          'Hey $name! 👋',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            color: themeProv.currentThemeIndex == 1 ? Colors.white70 : AppColors.muted,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    Text(
+                                      'Explore Dares',
+                                      style: GoogleFonts.bricolageGrotesque(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w800,
+                                        color: currentTheme.textMain,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              _buildHeaderIconButton(
-                                Icons.chat_bubble_outline_rounded,
-                                onTap: () {
-                                  // Navigate to chat tab or screen
-                                  // Since HomeScreen handles tabs, we can either navigate to a separate screen 
-                                  // or use a callback to change the index. 
-                                  // For simplicity and immediate access, navigating to ChatListScreen directly is good.
-                                  Navigator.pushNamed(context, AppConstants.chatListRoute);
-                                },
+                              const SizedBox(width: 12),
+                              Row(
+                                children: [
+                                  _buildHeaderIconButton(
+                                    Icons.search_rounded,
+                                    currentTheme,
+                                    themeProv.currentThemeIndex == 1,
+                                    onTap: () => Navigator.pushNamed(context, AppConstants.searchRoute),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Consumer<NotificationProvider>(
+                                    builder: (context, notifProv, _) => _buildHeaderIconButton(
+                                      Icons.notifications_none_rounded,
+                                      currentTheme,
+                                      themeProv.currentThemeIndex == 1,
+                                      hasNotification: notifProv.unreadCount > 0,
+                                      onTap: () => Navigator.pushNamed(context, AppConstants.notificationsRoute),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildHeaderIconButton(
+                                    Icons.chat_bubble_outline_rounded,
+                                    currentTheme,
+                                    themeProv.currentThemeIndex == 1,
+                                    onTap: () {
+                                      Navigator.pushNamed(context, AppConstants.chatListRoute);
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
+                          const SizedBox(height: 14),
+                          _buildStoriesList(currentTheme, themeProv.currentThemeIndex == 1),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      _buildStoriesList(),
-                    ],
+                    ),
                   ),
-                ),
-              ),
 
-              // Category Chips
-              SliverToBoxAdapter(
-                child: Container(
-                  height: 60,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      bool isSelected = _selectedChip == index;
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedChip = index),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: isSelected ? AppColors.primaryGradient : null,
-                            color: isSelected ? null : const Color(0xFFEDE9FE),
-                            borderRadius: BorderRadius.circular(100),
-                            boxShadow: isSelected ? [
-                              BoxShadow(
-                                color: AppColors.primaryStart.withOpacity(0.3),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
+                  // Category Chips
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 60,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        itemCount: _categories.length,
+                        itemBuilder: (context, index) {
+                          bool isSelected = _selectedChip == index;
+                          final isDark = themeProv.currentThemeIndex == 1;
+                          
+                          return GestureDetector(
+                            onTap: () => setState(() => _selectedChip = index),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: isSelected ? currentTheme.gradient : null,
+                                color: isSelected ? null : (isDark ? Colors.white10 : const Color(0xFFEDE9FE)),
+                                borderRadius: BorderRadius.circular(100),
+                                boxShadow: isSelected ? [
+                                  BoxShadow(
+                                    color: currentTheme.primaryStart.withOpacity(0.3),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ] : null,
                               ),
-                            ] : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            _categories[index],
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? Colors.white : AppColors.primaryStart,
+                              alignment: Alignment.center,
+                              child: Text(
+                                _categories[index],
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : currentTheme.primaryStart,
+                                ),
+                              ),
                             ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // Feed
+                  Consumer<DareProvider>(
+                    builder: (context, dareProv, child) {
+                      if (dareProv.isLoading && dareProv.feedDares.isEmpty) {
+                        return const SliverFillRemaining(
+                          child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
+                        );
+                      }
+
+                      if (dareProv.feedDares.isEmpty) {
+                        return SliverFillRemaining(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('No dares yet. Create one!'),
+                                TextButton(onPressed: _loadFeed, child: const Text('Refresh')),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              if (index == dareProv.feedDares.length) {
+                                return dareProv.isLoading 
+                                  ? const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 20),
+                                      child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
+                                    ) 
+                                  : const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: DareCard(dare: dareProv.feedDares[index]),
+                              );
+                            },
+                            childCount: dareProv.feedDares.length + 1,
                           ),
                         ),
                       );
                     },
                   ),
-                ),
+                ],
               ),
-
-              // Feed
-              Consumer<DareProvider>(
-                builder: (context, dareProv, child) {
-                  if (dareProv.isLoading && dareProv.feedDares.isEmpty) {
-                    return const SliverFillRemaining(
-                      child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
-                    );
-                  }
-
-                  if (dareProv.feedDares.isEmpty) {
-                    return SliverFillRemaining(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('No dares yet. Create one!'),
-                            TextButton(onPressed: _loadFeed, child: const Text('Refresh')),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index == dareProv.feedDares.length) {
-                            return dareProv.isLoading 
-                              ? const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 20),
-                                  child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
-                                ) 
-                              : const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: DareCard(dare: dareProv.feedDares[index]),
-                          );
-                        },
-                        childCount: dareProv.feedDares.length + 1,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeaderIconButton(IconData icon, {bool hasNotification = false, VoidCallback? onTap}) {
+  Widget _buildHeaderIconButton(IconData icon, AppTheme theme, bool isDark, {bool hasNotification = false, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFFF2EFFF),
+          color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF2EFFF),
           borderRadius: BorderRadius.circular(13),
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(icon, size: 18, color: AppColors.textMain),
+            Icon(icon, size: 18, color: theme.textMain),
             if (hasNotification)
               Positioned(
                 top: 7,
@@ -279,9 +316,9 @@ class _FeedScreenState extends State<FeedScreen> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryEnd,
+                    color: theme.primaryEnd,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: theme.background, width: 2),
                   ),
                 ),
               ),
@@ -291,30 +328,38 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildStoriesList() {
-    return Consumer2<LiveProvider, StoryProvider>(
-      builder: (context, liveProv, storyProv, _) {
+  Widget _buildStoriesList(AppTheme theme, bool isDark) {
+    return Consumer3<LiveProvider, StoryProvider, AuthProvider>(
+      builder: (context, liveProv, storyProv, authProv, _) {
         final List<Map<String, dynamic>> items = [
-          {'username': 'You', 'isMe': true},
+          {
+            'username': 'Your Story', 
+            'isMe': true, 
+            'avatar_url': authProv.user?['avatar_url']
+          },
           ...liveProv.activeStreams.map((s) => {...s, 'isLive': true}),
           ...storyProv.stories.map((s) => {...s, 'isStory': true}),
         ];
 
         return Container(
-          height: 86,
+          height: 100,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
+              final bool isLive = item['isLive'] == true;
+              final bool isStory = item['isStory'] == true;
+              final bool isMe = item['isMe'] == true;
+
               return Padding(
                 padding: const EdgeInsets.only(right: 14),
                 child: GestureDetector(
                   onTap: () {
-                    if (item['isMe'] == true) {
+                    if (isMe) {
                       _pickStoryMedia();
-                    } else if (item['isLive'] == true) {
-                      // Watch Stream
+                    } else if (isLive) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -325,7 +370,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                         ),
                       );
-                    } else if (item['isStory'] == true) {
+                    } else if (isStory) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -336,48 +381,80 @@ class _FeedScreenState extends State<FeedScreen> {
                   },
                   child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          gradient: item['isLive'] == true ? AppColors.primaryGradient : null,
-                          color: item['isLive'] == true ? null : Colors.grey.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Container(
-                            width: 46,
-                            height: 46,
+                      Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
-                              gradient: _getGradient(index),
+                              gradient: (isLive || isStory) ? theme.gradient : null,
+                              color: (isLive || isStory) ? null : (isDark ? Colors.white12 : Colors.grey.withOpacity(0.15)),
                               shape: BoxShape.circle,
                             ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              item['username'][0].toUpperCase(),
-                              style: GoogleFonts.bricolageGrotesque(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 18,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: theme.background,
+                                shape: BoxShape.circle,
                               ),
+                              child: _buildStoryAvatar(item, index, theme),
                             ),
                           ),
-                        ),
+                          if (isMe)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: theme.background,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    gradient: theme.gradient,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.add_rounded, size: 12, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          if (isLive)
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.white, width: 1.5),
+                                  ),
+                                  child: const Text(
+                                    'LIVE',
+                                    style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        index == 0 ? '+ Add' : (item['full_name'] ?? item['username']),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: 64,
+                        child: Text(
+                          isMe ? 'Your Story' : (item['username'] ?? 'User'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: theme.textMain,
+                            fontWeight: isMe || isLive || isStory ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -387,6 +464,41 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStoryAvatar(Map<String, dynamic> item, int index, AppTheme theme) {
+    final avatar = item['avatar_url'];
+    if (avatar != null && avatar.isNotEmpty) {
+      return Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          image: DecorationImage(
+            image: NetworkImage(AppConstants.getMediaUrl(avatar)),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: _getGradient(index),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        (item['username'] ?? 'U')[0].toUpperCase(),
+        style: GoogleFonts.bricolageGrotesque(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+        ),
+      ),
     );
   }
 

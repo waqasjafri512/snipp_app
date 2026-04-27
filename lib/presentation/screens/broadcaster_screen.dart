@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/live_provider.dart';
 import '../providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/services/socket_service.dart';
 import 'dart:ui';
+import 'dart:async';
 
 class BroadcasterScreen extends StatefulWidget {
   final String channelName;
@@ -25,11 +27,43 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
   bool _isJoined = false;
   bool _isLive = false;
   int? _localUid;
+  
+  final List<Map<String, dynamic>> _messages = [];
+  final ScrollController _chatScrollController = ScrollController();
+  StreamSubscription? _socketSub;
 
   @override
   void initState() {
     super.initState();
     _initAgora();
+    _initSocket();
+  }
+
+  void _initSocket() {
+    SocketService().emit('joinStream', widget.channelName);
+    _socketSub = SocketService().eventStream.listen((event) {
+      if (event['event'] == 'streamMessage') {
+        setState(() {
+          _messages.add(event['data']);
+          if (_messages.length > 50) _messages.removeAt(0);
+        });
+        _scrollToBottom();
+      } else if (event['event'] == 'streamReaction') {
+        // Show reaction animation
+      }
+    });
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _initAgora() async {
@@ -97,7 +131,10 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
 
   @override
   void dispose() {
+    _socketSub?.cancel();
+    SocketService().emit('leaveStream', widget.channelName);
     _engine?.release();
+    _chatScrollController.dispose();
     super.dispose();
   }
 
@@ -186,6 +223,40 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // Chat Messages Overlay
+          Positioned(
+            bottom: 150,
+            left: 20,
+            right: 80,
+            child: SizedBox(
+              height: 180,
+              child: ListView.builder(
+                controller: _chatScrollController,
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final msg = _messages[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${msg['username']}: ',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, shadows: [Shadow(blurRadius: 4)]),
+                          ),
+                          TextSpan(
+                            text: msg['message'],
+                            style: const TextStyle(color: Colors.white, fontSize: 13, shadows: [Shadow(blurRadius: 4)]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
 

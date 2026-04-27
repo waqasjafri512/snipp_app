@@ -37,6 +37,10 @@ class SocketService {
     
     // Notification events
     _socket!.on('newNotification', (data) => _eventController.add({'event': 'newNotification', 'data': data}));
+    
+    // Live Stream events
+    _socket!.on('streamMessage', (data) => _eventController.add({'event': 'streamMessage', 'data': data}));
+    _socket!.on('streamReaction', (data) => _eventController.add({'event': 'streamReaction', 'data': data}));
 
     _socket!.onDisconnect((_) => print('Socket unified disconnected'));
   }

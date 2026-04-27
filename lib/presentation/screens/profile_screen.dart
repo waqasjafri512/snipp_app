@@ -3,10 +3,17 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert';
+import '../../data/repositories/api_service.dart';
+import '../widgets/dare_card.dart';
 import 'edit_profile_screen.dart';
-import 'dare_detail_screen.dart';
 import 'chat_detail_screen.dart';
+import 'user_list_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int? userId;
@@ -22,7 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadProfile();
   }
 
@@ -46,49 +53,66 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showSettings(BuildContext context) {
-    showModalBottomSheet(
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+  }
+
+  Future<void> _pickImage(bool isAvatar) async {
+    final picker = ImagePicker();
+    
+    final source = await showDialog<ImageSource>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: Text('Settings and privacy', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.history_rounded),
-                title: Text('Your activity', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Colors.red),
-                title: Text('Log out', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await Provider.of<AuthProvider>(context, listen: false).logout();
-                  if (mounted) Navigator.pushReplacementNamed(context, AppConstants.loginRoute);
-                },
-              ),
-            ],
-          ),
+      builder: (context) => AlertDialog(
+        title: Text(isAvatar ? 'Update Profile Picture' : 'Update Cover Photo', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
         ),
       ),
     );
+
+    if (source == null) return;
+
+    final file = await picker.pickImage(source: source, imageQuality: 80);
+    if (file == null) return;
+
+    try {
+      final apiService = ApiService();
+      final endpoint = isAvatar ? '/profile/upload-avatar' : '/profile/upload-cover';
+      final fieldName = isAvatar ? 'avatar' : 'cover';
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Uploading...')));
+      }
+
+      final response = await apiService.uploadFile(endpoint, file.path, fieldName);
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload successful!')));
+          final userId = Provider.of<AuthProvider>(context, listen: false).user?['id'];
+          if (userId != null) {
+            Provider.of<ProfileProvider>(context, listen: false).fetchProfile(userId);
+          }
+        }
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload failed')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connection error')));
+    }
   }
 
   @override
@@ -96,315 +120,425 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final authProv = Provider.of<AuthProvider>(context, listen: false);
     final isOwnProfile = widget.userId == null || widget.userId == authProv.user?['id'];
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: Consumer<ProfileProvider>(
-          builder: (context, profileProv, _) => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isOwnProfile) const Icon(Icons.lock_outline_rounded, size: 16, color: Colors.black),
-              if (isOwnProfile) const SizedBox(width: 4),
-              Text(
-                profileProv.userProfile?['full_name'] ?? profileProv.userProfile?['username'] ?? 'Profile',
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final currentTheme = themeProv.currentTheme;
+        final isDark = themeProv.currentThemeIndex == 1;
+
+        return Scaffold(
+          backgroundColor: currentTheme.background,
+          appBar: AppBar(
+            backgroundColor: currentTheme.background,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Consumer<ProfileProvider>(
+              builder: (context, profileProv, _) => Text(
+                profileProv.userProfile?['username'] ?? 'Profile',
                 style: GoogleFonts.plusJakartaSans(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
+                  color: currentTheme.textMain, 
+                  fontWeight: FontWeight.w700, 
+                  fontSize: 16
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 20),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.search_rounded, color: currentTheme.textMain),
+                onPressed: () {},
+              ),
+              if (isOwnProfile)
+                IconButton(
+                  icon: Icon(Icons.menu_rounded, color: currentTheme.textMain),
+                  onPressed: () => _showSettings(context),
+                ),
             ],
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined, color: Colors.black, size: 26),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.black, size: 28),
-            onPressed: () => _showSettings(context),
-          ),
-        ],
-        leading: isOwnProfile ? null : IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Consumer<ProfileProvider>(
-        builder: (context, profileProv, child) {
-          if (profileProv.isLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primaryStart));
-          }
+          body: Consumer<ProfileProvider>(
+            builder: (context, profileProv, child) {
+              if (profileProv.isLoading) {
+                return Center(child: CircularProgressIndicator(color: currentTheme.primaryStart));
+              }
 
-          final profile = profileProv.userProfile;
-          if (profile == null) return const Center(child: Text('Profile not found'));
+              final profile = profileProv.userProfile;
+              if (profile == null) return Center(child: Text('Profile not found', style: TextStyle(color: currentTheme.textMain)));
 
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _buildAvatar(profile, size: 82),
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildStatItem('posts', profile['dares_count']?.toString() ?? '0'),
-                                _buildStatItem('followers', profile['followers_count']?.toString() ?? '0'),
-                                _buildStatItem('following', profile['following_count']?.toString() ?? '0'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            profile['full_name'] ?? 'Snipp User',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (profile['is_friend'] == true) ...[
-                            const SizedBox(width: 6),
+              return NestedScrollView(
+                headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+                  return <Widget>[
+                  // 1. Cover and Profile Picture Section
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            // Cover Photo
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              height: 200,
+                              width: double.infinity,
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
+                                color: isDark ? Colors.white10 : Colors.grey[200],
+                                image: profile['cover_url'] != null
+                                    ? DecorationImage(
+                                        image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
                               ),
-                              child: Text(
-                                'Friends',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 10,
-                                  color: Colors.blue[800],
-                                  fontWeight: FontWeight.w700,
+                              child: profile['cover_url'] == null
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        gradient: isDark 
+                                          ? LinearGradient(colors: [Colors.black, currentTheme.primaryStart.withOpacity(0.3)])
+                                          : const LinearGradient(
+                                              colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            // Profile Picture overlapping cover
+                            Positioned(
+                              bottom: -60,
+                              left: 16,
+                              child: GestureDetector(
+                                onTap: isOwnProfile ? () => _pickImage(true) : null,
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: currentTheme.background,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: _buildAvatar(profile, currentTheme, isDark, size: 140),
+                                    ),
+                                    if (isOwnProfile)
+                                      Positioned(
+                                        bottom: 10,
+                                        right: 10,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(color: currentTheme.background, shape: BoxShape.circle),
+                                          child: Icon(Icons.camera_alt_rounded, size: 20, color: currentTheme.textMain),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ] else if (profile['follows_me'] == true) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(4),
+                            // Cover Edit Button (if own profile)
+                            if (isOwnProfile)
+                              Positioned(
+                                bottom: 10,
+                                right: 16,
+                                child: _buildCircleIconButton(Icons.camera_alt_rounded, currentTheme, isDark, () => _pickImage(false)),
                               ),
-                              child: Text(
-                                'Follows you',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 10,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
                           ],
-                        ],
-                      ),
-                      if (profile['category'] != null)
-                        Text(
-                          profile['category'],
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
                         ),
-                      if (profile['bio'] != null && profile['bio'].isNotEmpty)
+                        const SizedBox(height: 64),
+                        // 2. Name and Info Section
                         Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            profile['bio'],
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              height: 1.4,
-                              color: Colors.black.withOpacity(0.9),
-                            ),
-                          ),
-                        ),
-                      if (profile['website'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            profile['website'],
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              color: const Color(0xFF00376B),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildProfileButton(
-                              isOwnProfile ? 'Edit profile' : ((profile['is_following'] ?? false) ? 'Following' : 'Follow'),
-                              () {
-                                if (isOwnProfile) {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()));
-                                } else {
-                                  profileProv.toggleFollow(profile['id']);
-                                }
-                              },
-                              isPrimary: !isOwnProfile && !(profile['is_following'] ?? false),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildProfileButton(
-                              isOwnProfile ? 'Share profile' : 'Message',
-                              () {
-                                if (isOwnProfile) {
-                                  // Share functionality could go here
-                                } else {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatDetailScreen(
-                                        otherUserId: profile['id'],
-                                        otherUserName: profile['username'],
-                                        otherUserAvatar: profile['avatar_url'],
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    profile['full_name'] ?? 'Snipp User',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: currentTheme.textMain,
+                                    ),
+                                  ),
+                                  if (profile['is_verified'] == true) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.verified, color: Colors.blue, size: 20),
+                                  ],
+                                ],
+                              ),
+                              if (profile['username'] != null)
+                                Text(
+                                  '@${profile['username']}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 15,
+                                    color: isDark ? Colors.white54 : Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              if (profile['bio'] != null && profile['bio'].isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: Text(
+                                    profile['bio'],
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 15,
+                                      height: 1.4,
+                                      color: currentTheme.textMain,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 20),
+                              // 3. Action Buttons (Facebook Style)
+                              Row(
+                                children: [
+                                  if (isOwnProfile) ...[
+                                    Expanded(
+                                      child: _buildFBButton(
+                                        'Add to Story', 
+                                        Icons.add_circle_rounded, 
+                                        currentTheme.primaryStart, 
+                                        Colors.white, 
+                                        () {}
                                       ),
                                     ),
-                                  );
-                                }
-                              },
-                            ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildFBButton(
+                                        'Edit Profile', 
+                                        Icons.edit_rounded, 
+                                        isDark ? Colors.white12 : Colors.grey[200]!, 
+                                        currentTheme.textMain, 
+                                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()))
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Expanded(
+                                      child: _buildFBButton(
+                                        (profile['is_following'] ?? false) ? 'Following' : 'Follow', 
+                                        (profile['is_following'] ?? false) ? Icons.check_rounded : Icons.person_add_rounded, 
+                                        (profile['is_following'] ?? false) ? (isDark ? Colors.white12 : Colors.grey[200]!) : currentTheme.primaryStart, 
+                                        (profile['is_following'] ?? false) ? currentTheme.textMain : Colors.white, 
+                                        () => profileProv.toggleFollow(profile['id'])
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildFBButton(
+                                        'Message', 
+                                        Icons.chat_bubble_rounded, 
+                                        isDark ? Colors.white12 : Colors.grey[200]!, 
+                                        currentTheme.textMain, 
+                                        () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => ChatDetailScreen(
+                                              otherUserId: profile['id'],
+                                              otherUserName: profile['username'],
+                                              otherUserAvatar: profile['avatar_url'],
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    ),
+                                  ],
+                                  const SizedBox(width: 8),
+                                  _buildFBIconButton(Icons.more_horiz_rounded, isDark ? Colors.white12 : Colors.grey[200]!, currentTheme.textMain, () {}),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Divider(color: isDark ? Colors.white10 : Colors.grey[200]),
+                              const SizedBox(height: 12),
+                              // 4. Details Section
+                              if (profile['works_at'] != null && profile['works_at'].isNotEmpty)
+                                _buildDetailItem(Icons.work_rounded, 'Works at ${profile['works_at']}', currentTheme, isDark),
+                              if (profile['studied_at'] != null && profile['studied_at'].isNotEmpty)
+                                _buildDetailItem(Icons.school_rounded, 'Studied at ${profile['studied_at']}', currentTheme, isDark),
+                              if (profile['location'] != null && profile['location'].isNotEmpty)
+                                _buildDetailItem(Icons.home_rounded, 'Lives in ${profile['location']}', currentTheme, isDark),
+                              if (profile['from_location'] != null && profile['from_location'].isNotEmpty)
+                                _buildDetailItem(Icons.location_on_rounded, 'From ${profile['from_location']}', currentTheme, isDark),
+                              _buildDetailItem(Icons.rss_feed_rounded, 'Followed by ${profile['followers_count'] ?? 0} people', currentTheme, isDark, isBold: true),
+                              const SizedBox(height: 16),
+                              _buildFBButton(
+                                'Edit Public Details', 
+                                null, 
+                                currentTheme.primaryStart.withOpacity(0.1), 
+                                isDark ? currentTheme.primaryEnd : currentTheme.primaryStart, 
+                                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()))
+                              ),
+                              const SizedBox(height: 20),
+                            ],
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 5. Tabs
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _SliverAppBarDelegate(
+                      TabBar(
+                        controller: _tabController,
+                        indicatorColor: currentTheme.primaryStart,
+                        labelColor: currentTheme.primaryStart,
+                        unselectedLabelColor: isDark ? Colors.white54 : Colors.grey[600],
+                        labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+                        tabs: const [
+                          Tab(text: 'Posts'),
+                          Tab(text: 'Dares'),
+                          Tab(text: 'Photos'),
                         ],
                       ),
-                    ],
+                      currentTheme.background,
+                      isDark,
+                    ),
                   ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: Colors.black,
-                    indicatorWeight: 1,
-                    labelColor: Colors.black,
-                    unselectedLabelColor: Colors.grey,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.grid_on_rounded, size: 22)),
-                      Tab(icon: Icon(Icons.play_circle_outline_rounded, size: 26)),
-                    ],
-                  ),
-                ),
-              ),
-              SliverFillRemaining(
-                child: TabBarView(
+                  ];
+                },
+                body: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildDaresGrid(profileProv.userDares),
-                    _buildDaresGrid(profileProv.participatedDares),
+                    _buildDaresList(profileProv.userDares, currentTheme, isDark),
+                    _buildDaresList(profileProv.participatedDares, currentTheme, isDark),
+                    _buildPhotosGrid(profileProv.userDares, currentTheme, isDark),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildProfileButton(String label, VoidCallback onTap, {bool isPrimary = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 32,
-        decoration: BoxDecoration(
-          color: isPrimary ? Colors.blue : Colors.grey[200],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            color: isPrimary ? Colors.white : Colors.black,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDaresGrid(List<dynamic> dares) {
-    if (dares.isEmpty) {
-      return Center(
-        child: Text(
-          'No content yet',
-          style: GoogleFonts.plusJakartaSans(color: AppColors.muted),
-        ),
-      );
-    }
-    return GridView.builder(
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 1,
-        mainAxisSpacing: 1,
-        childAspectRatio: 1,
-      ),
-      itemCount: dares.length,
-      itemBuilder: (context, index) {
-        final dare = dares[index];
-        return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => DareDetailScreen(dare: dare)),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              image: dare['media_url'] != null
-                  ? DecorationImage(
-                      image: NetworkImage(AppConstants.getMediaUrl(dare['media_url'])),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: dare['media_url'] == null
-                ? Center(
-                    child: Text(
-                      dare['emoji'] ?? '🔥',
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  )
-                : null,
+              );
+            },
           ),
         );
       },
     );
   }
 
-  Widget _buildAvatar(Map<String, dynamic> profile, {double size = 40}) {
+  Widget _buildCircleIconButton(IconData icon, AppTheme theme, bool isDark, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white10 : Colors.grey[100],
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 20, color: theme.textMain),
+      ),
+    );
+  }
+
+  Widget _buildFBButton(String label, IconData? icon, Color bgColor, Color textColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: textColor),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFBIconButton(IconData icon, Color bgColor, Color textColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        width: 48,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 20, color: textColor),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String text, AppTheme theme, bool isDark, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isDark ? Colors.white54 : Colors.grey[600]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+                color: theme.textMain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDaresList(List<dynamic> dares, AppTheme theme, bool isDark) {
+    if (dares.isEmpty) {
+      return Center(
+        child: Text('No posts yet', style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white24 : Colors.grey)),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8),
+      itemCount: dares.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+          child: DareCard(dare: dares[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhotosGrid(List<dynamic> dares, AppTheme theme, bool isDark) {
+    final photos = dares.where((d) => d['media_url'] != null).toList();
+    if (photos.isEmpty) {
+      return Center(child: Text('No photos yet', style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white24 : Colors.grey)));
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: photos.length,
+      itemBuilder: (context, index) {
+        return Image.network(AppConstants.getMediaUrl(photos[index]['media_url']), fit: BoxFit.cover);
+      },
+    );
+  }
+
+  Widget _buildAvatar(Map<String, dynamic> profile, AppTheme theme, bool isDark, {double size = 40}) {
     String? avatar = profile['avatar_url'];
-    int id = profile['id'] ?? 0;
-    
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.white10 : Colors.grey[100],
         shape: BoxShape.circle,
+        border: Border.all(color: theme.background, width: 4),
         image: (avatar != null && avatar.isNotEmpty)
             ? DecorationImage(
                 image: NetworkImage(AppConstants.getMediaUrl(avatar)),
@@ -417,71 +551,44 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ? Text(
               (profile['username'] ?? 'U')[0].toUpperCase(),
               style: TextStyle(
-                color: AppColors.primaryStart,
+                color: theme.primaryStart,
                 fontWeight: FontWeight.w800,
-                fontSize: size * 0.38,
+                fontSize: size * 0.35,
               ),
             )
           : null,
     );
   }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Colors.black,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color: Colors.black,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-      ],
-    );
-  }
-
-  LinearGradient _getGradient(int id) {
-    final gradients = [
-      const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFEC4899)]),
-      const LinearGradient(colors: [Color(0xFF0EA5E9), Color(0xFF7C3AED)]),
-      const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
-      const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]),
-      const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF59E0B)]),
-    ];
-    return gradients[id % gradients.length];
-  }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
+  _SliverAppBarDelegate(this._tabBar, this.bgColor, this.isDark);
 
   final TabBar _tabBar;
+  final Color bgColor;
+  final bool isDark;
 
   @override
-  double get minExtent => _tabBar.preferredSize.height;
+  double get minExtent => _tabBar.preferredSize.height + 2;
   @override
-  double get maxExtent => _tabBar.preferredSize.height;
+  double get maxExtent => _tabBar.preferredSize.height + 2;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Colors.white,
-      child: _tabBar,
+      color: bgColor,
+      child: Column(
+        children: [
+          Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
+          _tabBar,
+          Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
+        ],
+      ),
     );
   }
 
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
+    return oldDelegate.bgColor != bgColor || oldDelegate.isDark != isDark;
   }
 }

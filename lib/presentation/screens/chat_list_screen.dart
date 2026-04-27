@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'chat_detail_screen.dart';
 
@@ -33,152 +34,163 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryStart.withOpacity(0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Messages 💬',
-                    style: GoogleFonts.bricolageGrotesque(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMain,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search messages...',
-                      hintStyle: GoogleFonts.plusJakartaSans(color: AppColors.muted, fontSize: 14),
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.muted, size: 22),
-                      fillColor: const Color(0xFFF2EFFF),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final theme = themeProv.currentTheme;
+        final isDark = themeProv.currentThemeIndex == 1;
 
-            Expanded(
-              child: Consumer<ChatProvider>(
-                builder: (context, chatProv, child) {
-                  return ListView(
-                    padding: EdgeInsets.zero,
+        return Scaffold(
+          backgroundColor: theme.background,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  decoration: BoxDecoration(
+                    color: theme.background,
+                    boxShadow: isDark ? null : [
+                      BoxShadow(
+                        color: theme.primaryStart.withOpacity(0.07),
+                        blurRadius: 14,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    border: isDark ? Border(bottom: BorderSide(color: Colors.white10)) : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Active Conversations
-                      if (chatProv.conversations.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                          child: Text(
-                            'RECENT',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.muted,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                      Text(
+                        'Messages 💬',
+                        style: GoogleFonts.bricolageGrotesque(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textMain,
                         ),
-                        Container(
-                          height: 90,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: chatProv.conversations.length,
-                            itemBuilder: (context, index) {
-                              final conv = chatProv.conversations[index];
-                              final displayName = conv['full_name'] ?? conv['username'] ?? 'User';
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatDetailScreen(
-                                        otherUserId: conv['other_user_id'],
-                                        otherUserName: displayName,
-                                        otherUserAvatar: conv['avatar_url'],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        style: TextStyle(color: theme.textMain),
+                        decoration: InputDecoration(
+                          hintText: 'Search messages...',
+                          hintStyle: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white24 : AppColors.muted, fontSize: 14),
+                          prefixIcon: Icon(Icons.search_rounded, color: isDark ? Colors.white24 : AppColors.muted, size: 22),
+                          fillColor: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF2EFFF),
+                          filled: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: Consumer<ChatProvider>(
+                    builder: (context, chatProv, child) {
+                      return ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          // Active Conversations
+                          if (chatProv.conversations.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                              child: Text(
+                                'RECENT',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white54 : AppColors.muted,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 90,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                itemCount: chatProv.conversations.length,
+                                itemBuilder: (context, index) {
+                                  final conv = chatProv.conversations[index];
+                                  final displayName = conv['full_name'] ?? conv['username'] ?? 'User';
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatDetailScreen(
+                                            otherUserId: conv['other_user_id'],
+                                            otherUserName: displayName,
+                                            otherUserAvatar: conv['avatar_url'],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 16),
+                                      child: Column(
+                                        children: [
+                                          _buildAvatarWithStatus(conv['other_user_id'] ?? index, theme, isDark, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
+                                          const SizedBox(height: 4),
+                                          SizedBox(
+                                            width: 56,
+                                            child: Text(
+                                              displayName,
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 10,
+                                                color: isDark ? Colors.white70 : AppColors.muted,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
                                 },
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: Column(
-                                    children: [
-                                      _buildAvatarWithStatus(conv['other_user_id'] ?? index, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
-                                      const SizedBox(height: 4),
-                                      SizedBox(
-                                        width: 56,
-                                        child: Text(
-                                          displayName,
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 10,
-                                            color: AppColors.muted,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                              ),
+                            ),
+                          ],
 
-                      // Conversations List
-                      if (chatProv.isLoading && chatProv.conversations.isEmpty)
-                        const Center(child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: CircularProgressIndicator(color: AppColors.primaryStart),
-                        ))
-                      else if (chatProv.conversations.isEmpty)
-                        const Center(child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: Text('No messages yet'),
-                        ))
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Column(
-                            children: chatProv.conversations.map((conv) => _buildChatItem(conv)).toList(),
-                          ),
-                        ),
-                      const SizedBox(height: 100),
-                    ],
-                  );
-                },
-              ),
+                          // Conversations List
+                          if (chatProv.isLoading && chatProv.conversations.isEmpty)
+                            Center(child: Padding(
+                              padding: const EdgeInsets.all(40),
+                              child: CircularProgressIndicator(color: theme.primaryStart),
+                            ))
+                          else if (chatProv.conversations.isEmpty)
+                            Center(child: Padding(
+                              padding: const EdgeInsets.all(40),
+                              child: Text('No messages yet', style: TextStyle(color: theme.textMain)),
+                            ))
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Column(
+                                children: chatProv.conversations.map((conv) => _buildChatItem(conv, theme, isDark)).toList(),
+                              ),
+                            ),
+                          const SizedBox(height: 100),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildAvatarWithStatus(int idx, {bool isOnline = false, double size = 40, String initial = ''}) {
+  Widget _buildAvatarWithStatus(int idx, AppTheme theme, bool isDark, {bool isOnline = false, double size = 40, String initial = ''}) {
     return Stack(
       children: [
         Container(
@@ -208,7 +220,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF10B981),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: theme.background, width: 2),
               ),
             ),
           ),
@@ -216,7 +228,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatItem(Map<String, dynamic> conv) {
+  Widget _buildChatItem(Map<String, dynamic> conv, AppTheme theme, bool isDark) {
     bool isUnread = conv['is_read'] == false;
     int idx = conv['other_user_id'] % 5;
 
@@ -237,12 +249,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFF2EFFF))),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : const Color(0xFFF2EFFF))),
         ),
         child: Row(
           children: [
-            _buildAvatarWithStatus(idx, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
+            _buildAvatarWithStatus(idx, theme, isDark, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -256,14 +268,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: AppColors.textMain,
+                          color: theme.textMain,
                         ),
                       ),
                       Text(
                         _getTimeAgo(conv['last_message_time']),
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
-                          color: isUnread ? AppColors.primaryStart : AppColors.muted,
+                          color: isUnread ? theme.primaryStart : (isDark ? Colors.white54 : AppColors.muted),
                           fontWeight: isUnread ? FontWeight.w700 : FontWeight.w400,
                         ),
                       ),
@@ -276,7 +288,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: AppColors.muted,
+                      color: isDark ? Colors.white54 : AppColors.muted,
                     ),
                   ),
                 ],
@@ -288,7 +300,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 constraints: const BoxConstraints(minWidth: 22),
                 height: 22,
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  gradient: theme.gradient,
                   borderRadius: BorderRadius.circular(100),
                 ),
                 alignment: Alignment.center,

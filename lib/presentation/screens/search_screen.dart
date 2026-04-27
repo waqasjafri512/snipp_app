@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/search_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/dare_card.dart';
 import '../../core/constants/app_constants.dart';
 import 'profile_screen.dart';
@@ -21,6 +22,16 @@ class _SearchScreenState extends State<SearchScreen> {
   final List<String> _cats = ["All", "Users", "Dares", "Live"];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final searchProv = Provider.of<SearchProvider>(context, listen: false);
+      searchProv.fetchTrending();
+      searchProv.fetchTrendingCreators();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -35,270 +46,430 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryStart.withOpacity(0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 2),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProv, _) {
+        final currentTheme = themeProv.currentTheme;
+        final isDark = themeProv.currentThemeIndex == 1;
+
+        return Scaffold(
+          backgroundColor: currentTheme.background,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // Header with Search Bar
+                _buildSearchHeader(currentTheme, isDark),
+
+                Expanded(
+                  child: Consumer<SearchProvider>(
+                    builder: (context, searchProv, child) {
+                      if (searchProv.isLoading) {
+                        return Center(child: CircularProgressIndicator(color: currentTheme.primaryStart));
+                      }
+
+                      if (!_isSearching) {
+                        return _buildDiscoveryView(searchProv, currentTheme, isDark);
+                      }
+
+                      return _buildSearchResults(searchProv, currentTheme, isDark);
+                    },
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchHeader(AppTheme theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      decoration: BoxDecoration(
+        color: theme.background,
+        border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.08))),
+      ),
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearch,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600, 
+                fontSize: 15,
+                color: theme.textMain,
               ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: _onSearch,
-                          decoration: InputDecoration(
-                            hintText: '🔍  Search people, dares...',
-                            fillColor: const Color(0xFFF2EFFF),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
+              decoration: InputDecoration(
+                hintText: 'Search people, dares...',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  color: isDark ? Colors.white54 : AppColors.muted, 
+                  fontWeight: FontWeight.w500,
+                ),
+                prefixIcon: Icon(Icons.search_rounded, color: theme.primaryStart),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 36,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _cats.length,
+              itemBuilder: (context, index) {
+                bool isSel = _selectedCat == index;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCat = index),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: isSel ? theme.gradient : null,
+                      color: isSel ? null : (isDark ? Colors.white10 : const Color(0xFFF2EFFF)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _cats[index],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isSel ? Colors.white : theme.primaryStart,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 38,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _cats.length,
-                      itemBuilder: (context, index) {
-                        bool isSel = _selectedCat == index;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedCat = index),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              gradient: isSel ? AppColors.primaryGradient : null,
-                              color: isSel ? null : const Color(0xFFF2EFFF),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              _cats[index],
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isSel ? Colors.white : AppColors.primaryStart,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-
-            Expanded(
-              child: Consumer<SearchProvider>(
-                builder: (context, searchProv, child) {
-                  if (searchProv.isLoading) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.primaryStart));
-                  }
-
-                  if (!_isSearching) {
-                    return _buildTrendingSection(searchProv);
-                  }
-
-                  if (searchProv.searchResultsUsers.isEmpty && searchProv.searchResultsDares.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('No results found 🔍', style: TextStyle(fontSize: 28)),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Try searching for something else',
-                            style: GoogleFonts.plusJakartaSans(color: AppColors.muted),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    children: [
-                      if (searchProv.searchResultsUsers.isNotEmpty) ...[
-                        Text(
-                          'People',
-                          style: GoogleFonts.bricolageGrotesque(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textMain,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...searchProv.searchResultsUsers.map((user) => _buildUserTile(user)),
-                        const SizedBox(height: 24),
-                      ],
-                      if (searchProv.searchResultsDares.isNotEmpty) ...[
-                        Text(
-                          'Dares',
-                          style: GoogleFonts.bricolageGrotesque(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textMain,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...searchProv.searchResultsDares.map((dare) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: DareCard(dare: dare),
-                        )),
-                      ],
-                      const SizedBox(height: 100),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTrendingSection(SearchProvider searchProv) {
+  Widget _buildDiscoveryView(SearchProvider searchProv, AppTheme theme, bool isDark) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       children: [
-        Text(
-          'Trending Challenges 🔥',
-          style: GoogleFonts.bricolageGrotesque(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textMain,
+        // Trending Creators
+        if (searchProv.trendingUsers.isNotEmpty) ...[
+          _buildSectionTitle('Trending Creators ✨', theme),
+          const SizedBox(height: 16),
+          _buildTrendingCreators(searchProv.trendingUsers, theme, isDark),
+          const SizedBox(height: 32),
+        ],
+        
+        // Popular Categories
+        _buildSectionTitle('Explore Categories 🔍', theme),
+        const SizedBox(height: 16),
+        _buildCategoryGrid(theme, isDark),
+
+        const SizedBox(height: 32),
+        
+        // Popular Dares
+        _buildSectionTitle('Active Dares 🔥', theme),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: searchProv.trendingDares.map((dare) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: DareCard(dare: dare),
+            )).toList(),
           ),
         ),
-        const SizedBox(height: 16),
-        ...searchProv.trendingDares.map((dare) => Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: DareCard(dare: dare),
-        )),
+        const SizedBox(height: 100),
       ],
     );
   }
 
-  Widget _buildUserTile(Map<String, dynamic> user) {
-    bool isFollowing = user['is_following'] == true;
-    int idx = user['id'] % 5;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ProfileScreen(userId: user['id'])),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFF2EFFF))),
+  Widget _buildSectionTitle(String title, AppTheme theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        title,
+        style: GoogleFonts.bricolageGrotesque(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          color: theme.textMain,
         ),
-        child: Row(
-          children: [
-            _buildAvatar(idx, size: 48),
-            const SizedBox(width: 14),
-            Expanded(
+      ),
+    );
+  }
+
+  Widget _buildTrendingCreators(List<dynamic> users, AppTheme theme, bool isDark) {
+    return SizedBox(
+      height: 140,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: users.length,
+        itemBuilder: (context, index) {
+          final user = users[index];
+          return GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(userId: user['id']))),
+            child: Container(
+              width: 100,
+              margin: const EdgeInsets.only(right: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    width: 74,
+                    height: 74,
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      gradient: theme.gradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.background,
+                        shape: BoxShape.circle,
+                        image: user['avatar_url'] != null 
+                          ? DecorationImage(image: NetworkImage(AppConstants.getMediaUrl(user['avatar_url'])), fit: BoxFit.cover)
+                          : null,
+                      ),
+                      child: user['avatar_url'] == null 
+                        ? Center(
+                            child: Text(
+                              (user['full_name'] ?? user['username'])[0].toUpperCase(),
+                              style: GoogleFonts.bricolageGrotesque(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: theme.primaryStart,
+                              ),
+                            ),
+                          )
+                        : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     user['full_name'] ?? user['username'],
                     style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12, 
                       fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.textMain,
+                      color: theme.textMain,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                   Text(
-                    '@${user['username']}',
+                    '${user['followers_count'] ?? 0} followers',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      color: AppColors.muted,
+                      fontSize: 10, 
+                      color: isDark ? Colors.white54 : AppColors.muted,
                     ),
                   ),
                 ],
               ),
             ),
-            _buildFollowButton(isFollowing, () {
-              Provider.of<ProfileProvider>(context, listen: false).toggleFollow(user['id']);
-              setState(() => user['is_following'] = !isFollowing);
-            }),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryGrid(AppTheme theme, bool isDark) {
+    final List<Map<String, dynamic>> categories = [
+      {'name': 'Fitness', 'icon': '💪', 'color': isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4)},
+      {'name': 'Funny', 'icon': '😂', 'color': isDark ? const Color(0xFF7C2D12).withOpacity(0.3) : const Color(0xFFFFF7ED)},
+      {'name': 'Creative', 'icon': '🎨', 'color': isDark ? const Color(0xFF4C1D95).withOpacity(0.3) : const Color(0xFFF5F3FF)},
+      {'name': 'Food', 'icon': '🍕', 'color': isDark ? const Color(0xFF991B1B).withOpacity(0.3) : const Color(0xFFFEF2F2)},
+      {'name': 'Travel', 'icon': '✈️', 'color': isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : const Color(0xFFEFF6FF)},
+      {'name': 'Gaming', 'icon': '🎮', 'color': isDark ? const Color(0xFF9D174D).withOpacity(0.3) : const Color(0xFFFFF1F2)},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 2.2,
+        ),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          return Container(
+            decoration: BoxDecoration(
+              color: cat['color'],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(cat['icon'], style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 8),
+                Text(
+                  cat['name'],
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: theme.textMain,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchResults(SearchProvider searchProv, AppTheme theme, bool isDark) {
+    if (searchProv.searchResultsUsers.isEmpty && searchProv.searchResultsDares.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🔍', style: TextStyle(fontSize: 64)),
+            const SizedBox(height: 16),
+            Text(
+              'No matches found',
+              style: GoogleFonts.bricolageGrotesque(
+                fontSize: 18, 
+                fontWeight: FontWeight.w800,
+                color: theme.textMain,
+              ),
+            ),
+            Text(
+              'Try a different keyword',
+              style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white54 : AppColors.muted),
+            ),
           ],
         ),
-      ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        if (searchProv.searchResultsUsers.isNotEmpty) ...[
+          Text(
+            'People',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800, 
+              fontSize: 13, 
+              color: isDark ? Colors.white54 : AppColors.muted,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...searchProv.searchResultsUsers.map((user) => _buildUserTile(user, theme, isDark)),
+          const SizedBox(height: 24),
+        ],
+        if (searchProv.searchResultsDares.isNotEmpty) ...[
+          Text(
+            'Dares',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800, 
+              fontSize: 13, 
+              color: isDark ? Colors.white54 : AppColors.muted,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...searchProv.searchResultsDares.map((dare) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: DareCard(dare: dare),
+          )),
+        ],
+      ],
     );
   }
 
-  Widget _buildAvatar(int idx, {double size = 40}) {
+  Widget _buildUserTile(Map<String, dynamic> user, AppTheme theme, bool isDark) {
+    bool isFollowing = user['is_following'] == true;
+    
     return Container(
-      width: size,
-      height: size,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: _getGradient(idx),
-        shape: BoxShape.circle,
+        color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        'U',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: size * 0.38,
-        ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+            backgroundImage: user['avatar_url'] != null
+                ? NetworkImage(AppConstants.getMediaUrl(user['avatar_url']))
+                : null,
+            child: user['avatar_url'] == null
+                ? Text(
+                    (user['username'] ?? 'U')[0].toUpperCase(), 
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: theme.textMain,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user['full_name'] ?? user['username'],
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700, 
+                    fontSize: 15,
+                    color: theme.textMain,
+                  ),
+                ),
+                Text(
+                  '@${user['username']}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12, 
+                    color: isDark ? Colors.white54 : AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildFollowButton(isFollowing, theme, isDark, () {
+            Provider.of<ProfileProvider>(context, listen: false).toggleFollow(user['id']);
+            setState(() => user['is_following'] = !isFollowing);
+          }),
+        ],
       ),
     );
   }
 
-  Widget _buildFollowButton(bool isFollowing, VoidCallback onTap) {
+  Widget _buildFollowButton(bool isFollowing, AppTheme theme, bool isDark, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          gradient: isFollowing ? null : AppColors.primaryGradient,
-          color: isFollowing ? const Color(0xFFF2EFFF) : null,
+          gradient: isFollowing ? null : theme.gradient,
+          color: isFollowing ? (isDark ? Colors.transparent : Colors.white) : null,
           borderRadius: BorderRadius.circular(12),
+          border: isFollowing ? Border.all(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)) : null,
         ),
         child: Text(
           isFollowing ? 'Following' : 'Follow',
           style: GoogleFonts.plusJakartaSans(
-            color: isFollowing ? AppColors.primaryStart : Colors.white,
+            color: isFollowing ? theme.textMain : Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
     );
-  }
-
-  LinearGradient _getGradient(int id) {
-    final gradients = [
-      const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFEC4899)]),
-      const LinearGradient(colors: [Color(0xFF0EA5E9), Color(0xFF7C3AED)]),
-      const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
-      const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]),
-      const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF59E0B)]),
-    ];
-    return gradients[id % gradients.length];
   }
 }
