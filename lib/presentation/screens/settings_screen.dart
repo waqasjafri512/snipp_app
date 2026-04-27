@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'edit_profile_screen.dart';
+import 'blocked_users_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -72,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.visibility_off_outlined,
             title: 'Blocked Accounts',
             subtitle: 'Users you have blocked',
-            onTap: () => _showComingSoon(context, 'Blocked Accounts'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BlockedUsersScreen())),
           ),
           _buildSettingsTile(
             context,

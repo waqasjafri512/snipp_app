@@ -56,6 +56,76 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
   }
 
+  void _showMoreOptions(BuildContext context, Map<String, dynamic> profile, bool isOwnProfile) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false).currentTheme;
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).currentThemeIndex == 1;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: theme.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            if (!isOwnProfile) ...[
+              ListTile(
+                leading: const Icon(Icons.block_flipped, color: Colors.redAccent),
+                title: Text('Block @${profile['username']}', style: GoogleFonts.plusJakartaSans(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmBlock(context, profile);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.report_gmailerrorred_rounded, color: theme.textMain),
+                title: Text('Report Account', style: GoogleFonts.plusJakartaSans(color: theme.textMain)),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+            ListTile(
+              leading: Icon(Icons.share_outlined, color: theme.textMain),
+              title: Text('Share Profile', style: GoogleFonts.plusJakartaSans(color: theme.textMain)),
+              onTap: () => Navigator.pop(context),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmBlock(BuildContext context, Map<String, dynamic> profile) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Block ${profile['username']}?'),
+        content: Text('They won\'t be able to find your profile, see your dares, or message you. Snipp won\'t let them know you blocked them.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final success = await Provider.of<ProfileProvider>(context, listen: false).blockUser(profile['id']);
+              if (success && mounted) {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Go back to feed/previous screen
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('@${profile['username']} has been blocked')));
+              }
+            },
+            child: const Text('Block', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   Future<void> _pickImage(bool isAvatar) async {
     final picker = ImagePicker();
     
@@ -130,10 +200,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           appBar: AppBar(
             backgroundColor: currentTheme.background,
             elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
-              onPressed: () => Navigator.pop(context),
-            ),
+            leading: Navigator.canPop(context)
+                ? IconButton(
+                    icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
+                    onPressed: () => Navigator.pop(context),
+                  )
+                : null,
             title: Consumer<ProfileProvider>(
               builder: (context, profileProv, _) => Text(
                 profileProv.userProfile?['username'] ?? 'Profile',
@@ -172,77 +244,84 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   SliverToBoxAdapter(
                     child: Column(
                       children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.bottomCenter,
-                          children: [
-                            // Cover Photo
-                            Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.grey[200],
-                                image: profile['cover_url'] != null
-                                    ? DecorationImage(
-                                        image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null,
-                              ),
-                              child: profile['cover_url'] == null
-                                  ? Container(
-                                      decoration: BoxDecoration(
-                                        gradient: isDark 
-                                          ? LinearGradient(colors: [Colors.black, currentTheme.primaryStart.withOpacity(0.3)])
-                                          : const LinearGradient(
-                                              colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            // Profile Picture overlapping cover
-                            Positioned(
-                              bottom: -60,
-                              left: 16,
-                              child: GestureDetector(
-                                onTap: isOwnProfile ? () => _pickImage(true) : null,
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: currentTheme.background,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: _buildAvatar(profile, currentTheme, isDark, size: 140),
-                                    ),
-                                    if (isOwnProfile)
-                                      Positioned(
-                                        bottom: 10,
-                                        right: 10,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(color: currentTheme.background, shape: BoxShape.circle),
-                                          child: Icon(Icons.camera_alt_rounded, size: 20, color: currentTheme.textMain),
-                                        ),
-                                      ),
-                                  ],
+                        SizedBox(
+                          height: 260, // 200 cover + 60 avatar overflow
+                          child: Stack(
+                            children: [
+                              // Cover Photo
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: 200,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white10 : Colors.grey[200],
+                                    image: profile['cover_url'] != null
+                                        ? DecorationImage(
+                                            image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                  ),
+                                  child: profile['cover_url'] == null
+                                      ? Container(
+                                          decoration: BoxDecoration(
+                                            gradient: isDark 
+                                              ? LinearGradient(colors: [Colors.black, currentTheme.primaryStart.withOpacity(0.3)])
+                                              : const LinearGradient(
+                                                  colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                          ),
+                                        )
+                                      : null,
                                 ),
                               ),
-                            ),
-                            // Cover Edit Button (if own profile)
-                            if (isOwnProfile)
+                              // Profile Picture overlapping cover
                               Positioned(
-                                bottom: 10,
-                                right: 16,
-                                child: _buildCircleIconButton(Icons.camera_alt_rounded, currentTheme, isDark, () => _pickImage(false)),
+                                bottom: 0,
+                                left: 16,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: isOwnProfile ? () => _pickImage(true) : null,
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: currentTheme.background,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: _buildAvatar(profile, currentTheme, isDark, size: 140),
+                                      ),
+                                      if (isOwnProfile)
+                                        Positioned(
+                                          bottom: 10,
+                                          right: 10,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(color: currentTheme.background, shape: BoxShape.circle),
+                                            child: Icon(Icons.camera_alt_rounded, size: 20, color: currentTheme.textMain),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                          ],
+                              // Cover Edit Button (if own profile)
+                              if (isOwnProfile)
+                                Positioned(
+                                  top: 150,
+                                  right: 16,
+                                  child: _buildCircleIconButton(Icons.camera_alt_rounded, currentTheme, isDark, () => _pickImage(false)),
+                                ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 64),
+                        // Removed the 64px SizedBox since the Stack now includes the 60px height
+                        const SizedBox(height: 10),
                         // 2. Name and Info Section
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -341,7 +420,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     ),
                                   ],
                                   const SizedBox(width: 8),
-                                  _buildFBIconButton(Icons.more_horiz_rounded, isDark ? Colors.white12 : Colors.grey[200]!, currentTheme.textMain, () {}),
+                                  _buildFBIconButton(
+                                    Icons.more_horiz_rounded, 
+                                    isDark ? Colors.white12 : Colors.grey[200]!, 
+                                    currentTheme.textMain, 
+                                    () => _showMoreOptions(context, profile, isOwnProfile)
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -496,7 +580,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildDaresList(List<dynamic> dares, AppTheme theme, bool isDark) {
     if (dares.isEmpty) {
       return Center(
-        child: Text('No posts yet', style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white24 : Colors.grey)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey[100], shape: BoxShape.circle),
+              child: Icon(Icons.post_add_rounded, size: 40, color: theme.primaryStart.withOpacity(0.5)),
+            ),
+            const SizedBox(height: 16),
+            Text('No posts yet', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: theme.textMain)),
+            const SizedBox(height: 8),
+            Text('When you post dares or moments,\nthey will show up here.', textAlign: TextAlign.center, style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white54 : Colors.grey[600])),
+          ],
+        ),
       );
     }
     return ListView.builder(
@@ -514,7 +611,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildPhotosGrid(List<dynamic> dares, AppTheme theme, bool isDark) {
     final photos = dares.where((d) => d['media_url'] != null).toList();
     if (photos.isEmpty) {
-      return Center(child: Text('No photos yet', style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white24 : Colors.grey)));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey[100], shape: BoxShape.circle),
+              child: Icon(Icons.photo_library_rounded, size: 40, color: theme.primaryStart.withOpacity(0.5)),
+            ),
+            const SizedBox(height: 16),
+            Text('No photos yet', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: theme.textMain)),
+          ],
+        ),
+      );
     }
     return GridView.builder(
       padding: const EdgeInsets.all(2),

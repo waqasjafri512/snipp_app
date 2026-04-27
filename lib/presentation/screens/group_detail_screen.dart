@@ -2,75 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import '../providers/chat_provider.dart';
+import '../providers/group_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import 'dart:async';
 import '../../core/constants/app_constants.dart';
-import '../../data/services/socket_service.dart';
 
-class ChatDetailScreen extends StatefulWidget {
-  final int otherUserId;
-  final String otherUserName;
-  final String? otherUserAvatar;
+class GroupDetailScreen extends StatefulWidget {
+  final int groupId;
+  final String groupName;
+  final String? groupAvatar;
 
-  const ChatDetailScreen({
+  const GroupDetailScreen({
     super.key,
-    required this.otherUserId,
-    required this.otherUserName,
-    this.otherUserAvatar,
+    required this.groupId,
+    required this.groupName,
+    this.groupAvatar,
   });
 
   @override
-  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+  State<GroupDetailScreen> createState() => _GroupDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen> {
+class _GroupDetailScreenState extends State<GroupDetailScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
-  
-  late StreamSubscription _socketSub;
-  bool _isOnline = false;
-  DateTime? _lastSeen;
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
-    _socketSub = SocketService().eventStream.listen(_onSocketEvent);
-    SocketService().emit('checkUserStatus', widget.otherUserId);
-  }
-
-  void _onSocketEvent(Map<String, dynamic> event) {
-    if (event['event'] == 'userStatus') {
-      final data = event['data'];
-      if (data['userId'] == widget.otherUserId) {
-        if (mounted) {
-          setState(() {
-            _isOnline = data['online'] == true;
-            if (data['lastSeen'] != null) {
-              _lastSeen = DateTime.parse(data['lastSeen']).toLocal();
-            }
-          });
-        }
-      }
-    }
-  }
-
-  String _formatLastSeen(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inMinutes < 1) return 'just now';
-    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
-    if (difference.inHours < 24) return '${difference.inHours}h ago';
-    if (difference.inDays == 1) return 'yesterday';
-    return '${difference.inDays}d ago';
   }
 
   void _loadHistory() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ChatProvider>(context, listen: false).fetchChatHistory(widget.otherUserId);
+      Provider.of<GroupProvider>(context, listen: false).fetchGroupMessages(widget.groupId);
     });
   }
 
@@ -103,14 +69,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     if (media != null && mounted) {
       final authProv = Provider.of<AuthProvider>(context, listen: false);
-      final chatProv = Provider.of<ChatProvider>(context, listen: false);
+      final groupProv = Provider.of<GroupProvider>(context, listen: false);
       
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Uploading media...')));
-      final success = await chatProv.sendMediaMessage(authProv.user!['id'], widget.otherUserId, media.path);
       
-      if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload media')));
-      }
+      // In a real app we'd have sendGroupMediaMessage on the provider.
+      // For now, we'll just mock the visual feedback or use a similar approach as ChatProvider.
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group media coming soon!')));
     }
   }
 
@@ -119,9 +84,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (text.isEmpty) return;
 
     final authProv = Provider.of<AuthProvider>(context, listen: false);
-    final chatProv = Provider.of<ChatProvider>(context, listen: false);
+    final groupProv = Provider.of<GroupProvider>(context, listen: false);
 
-    chatProv.sendMessage(authProv.user!['id'], widget.otherUserId, text);
+    groupProv.sendGroupMessage(authProv.user!['id'], widget.groupId, text);
     _messageController.clear();
     
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -134,9 +99,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void dispose() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ChatProvider>(context, listen: false).clearActiveChat();
+      Provider.of<GroupProvider>(context, listen: false).clearActiveGroup();
     });
-    _socketSub.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -164,20 +128,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             title: Row(
               children: [
                 _buildAvatar(
-                  widget.otherUserId % 5,
+                  widget.groupId % 5,
                   theme,
                   isDark,
                   size: 40,
-                  isOnline: _isOnline,
-                  avatarUrl: widget.otherUserAvatar,
-                  initial: widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                  avatarUrl: widget.groupAvatar,
+                  initial: widget.groupName.isNotEmpty ? widget.groupName[0].toUpperCase() : 'G',
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.otherUserName,
+                      widget.groupName,
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -185,13 +148,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                     ),
                     Text(
-                      _isOnline 
-                        ? '● Active now' 
-                        : (_lastSeen != null ? 'Last seen ${_formatLastSeen(_lastSeen!)}' : 'Offline'),
+                      'Group Chat',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _isOnline ? const Color(0xFF10B981) : (isDark ? Colors.white54 : Colors.grey[600]),
+                        color: isDark ? Colors.white54 : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -200,12 +161,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             actions: [
               GestureDetector(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting Audio Call...'))),
-                child: _buildPremiumHeaderIcon(Icons.call_outlined, theme, isDark),
-              ),
-              GestureDetector(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting Video Call...'))),
-                child: _buildPremiumHeaderIcon(Icons.videocam_outlined, theme, isDark),
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group settings coming soon!'))),
+                child: _buildPremiumHeaderIcon(Icons.info_outline_rounded, theme, isDark),
               ),
               const SizedBox(width: 8),
             ],
@@ -217,43 +174,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           body: Column(
             children: [
               Expanded(
-                child: Consumer<ChatProvider>(
-                  builder: (context, chatProv, child) {
+                child: Consumer<GroupProvider>(
+                  builder: (context, groupProv, child) {
+                    if (groupProv.isLoading && groupProv.messages.isEmpty) {
+                      return Center(child: CircularProgressIndicator(color: theme.primaryStart));
+                    }
+                    
                     return ListView.builder(
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                      itemCount: chatProv.messages.length + 1,
+                      itemCount: groupProv.messages.length,
                       itemBuilder: (context, index) {
-                        if (index == chatProv.messages.length) {
-                          return Center(
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 20),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : const Color(0xFFE5E7EB),
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Text(
-                                'Today',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.white54 : AppColors.muted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        final msg = chatProv.messages[index];
+                        final msg = groupProv.messages[index];
                         final isMe = msg['sender_id'] == currentUserId;
-                        final isRead = msg['is_read'] == true;
                         
                         return _buildMessageBubble(
                           msg['content'], 
                           isMe, 
-                          _formatTime(msg['created_at']), 
-                          isRead,
+                          _formatTime(msg['created_at']),
+                          msg['username'] ?? 'User',
+                          msg['avatar_url'],
                           theme, 
                           isDark,
                           type: msg['type'],
@@ -387,50 +328,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildAvatar(int idx, AppTheme theme, bool isDark, {double size = 40, bool isOnline = false, String? avatarUrl, String initial = 'U'}) {
-    return Stack(
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            gradient: (avatarUrl == null || avatarUrl.isEmpty) ? _getGradient(idx) : null,
-            color: (avatarUrl == null || avatarUrl.isEmpty) ? null : (isDark ? Colors.white10 : Colors.grey[200]),
-            shape: BoxShape.circle,
-            image: (avatarUrl != null && avatarUrl.isNotEmpty)
-                ? DecorationImage(
-                    image: NetworkImage(AppConstants.getMediaUrl(avatarUrl)),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: (avatarUrl == null || avatarUrl.isEmpty)
-              ? Text(
-                  initial,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: size * 0.38,
-                  ),
-                )
-              : null,
-        ),
-        if (isOnline)
-          Positioned(
-            bottom: 1,
-            right: 1,
-            child: Container(
-              width: size * 0.25,
-              height: size * 0.25,
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981),
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.background, width: 2),
+  Widget _buildAvatar(int idx, AppTheme theme, bool isDark, {double size = 40, String? avatarUrl, String initial = 'U'}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: (avatarUrl == null || avatarUrl.isEmpty) ? _getGradient(idx) : null,
+        color: (avatarUrl == null || avatarUrl.isEmpty) ? null : (isDark ? Colors.white10 : Colors.grey[200]),
+        shape: BoxShape.circle,
+        image: (avatarUrl != null && avatarUrl.isNotEmpty)
+            ? DecorationImage(
+                image: NetworkImage(AppConstants.getMediaUrl(avatarUrl)),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: (avatarUrl == null || avatarUrl.isEmpty)
+          ? Text(
+              initial,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: size * 0.38,
               ),
-            ),
-          ),
-      ],
+            )
+          : null,
     );
   }
 
@@ -447,98 +370,110 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  Widget _buildMessageBubble(String text, bool isMe, String time, bool isRead, AppTheme theme, bool isDark, {String? type, String? mediaUrl}) {
+  Widget _buildMessageBubble(String text, bool isMe, String time, String senderName, String? senderAvatar, AppTheme theme, bool isDark, {String? type, String? mediaUrl}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
             _buildAvatar(
-              widget.otherUserId % 5,
+              senderName.length % 5,
               theme,
               isDark,
               size: 28,
-              avatarUrl: widget.otherUserAvatar,
-              initial: widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+              avatarUrl: senderAvatar,
+              initial: senderName.isNotEmpty ? senderName[0].toUpperCase() : 'U',
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: isMe ? theme.gradient : null,
-                color: isMe ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isMe ? 20 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 20),
-                ),
-                boxShadow: isDark ? null : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (type == 'image' && mediaUrl != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          mediaUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              width: 200,
-                              height: 200,
-                              color: isDark ? Colors.white10 : Colors.grey[200],
-                              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            );
-                          },
-                        ),
-                      ),
-                    )
-                  else if (type == 'video')
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Container(
-                        width: 200,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48),
-                        ),
-                      ),
-                    ),
-                  if (text != '[Media Message]')
-                    Text(
-                      text,
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      senderName,
                       style: GoogleFonts.plusJakartaSans(
-                        color: isMe ? Colors.white : theme.textMain,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
+                        fontSize: 11,
+                        color: isDark ? Colors.white54 : Colors.grey[600],
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  const SizedBox(height: 4),
-                  Row(
+                  ),
+                Container(
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: isMe ? theme.gradient : null,
+                    color: isMe ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isMe ? 20 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 20),
+                    ),
+                    boxShadow: isDark ? null : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (type == 'image' && mediaUrl != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              mediaUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  width: 200,
+                                  height: 200,
+                                  color: isDark ? Colors.white10 : Colors.grey[200],
+                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                );
+                              },
+                            ),
+                          ),
+                        )
+                      else if (type == 'video')
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            width: 200,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48),
+                            ),
+                          ),
+                        ),
+                      if (text != '[Media Message]')
+                        Text(
+                          text,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: isMe ? Colors.white : theme.textMain,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
                       Text(
                         time,
                         style: GoogleFonts.plusJakartaSans(
@@ -547,20 +482,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (isMe) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          isRead ? Icons.done_all_rounded : Icons.done_rounded,
-                          size: 13,
-                          color: isRead 
-                            ? (isDark ? Colors.cyanAccent : Colors.blueAccent) 
-                            : Colors.white.withOpacity(0.7),
-                        ),
-                      ],
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           if (isMe) const SizedBox(width: 8),
@@ -568,7 +493,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
-
 
   LinearGradient _getGradient(int id) {
     final gradients = [

@@ -8,8 +8,12 @@ import '../providers/story_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/theme_provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../widgets/dare_card.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
+import '../widgets/staggered_animation.dart';
+import '../widgets/shimmer_loading.dart';
+import '../widgets/dare_card.dart';
 import 'dare_detail_screen.dart';
 import 'story_viewer_screen.dart';
 import 'viewer_screen.dart';
@@ -242,8 +246,14 @@ class _FeedScreenState extends State<FeedScreen> {
                   Consumer<DareProvider>(
                     builder: (context, dareProv, child) {
                       if (dareProv.isLoading && dareProv.feedDares.isEmpty) {
-                        return const SliverFillRemaining(
-                          child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
+                        return SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => const DareCardShimmer(),
+                              childCount: 3,
+                            ),
+                          ),
                         );
                       }
 
@@ -268,15 +278,15 @@ class _FeedScreenState extends State<FeedScreen> {
                             (context, index) {
                               if (index == dareProv.feedDares.length) {
                                 return dareProv.isLoading 
-                                  ? const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 20),
-                                      child: Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
-                                    ) 
+                                  ? const DareCardShimmer()
                                   : const SizedBox.shrink();
                               }
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 16),
-                                child: DareCard(dare: dareProv.feedDares[index]),
+                                child: StaggeredListAnimation(
+                                  index: index,
+                                  child: DareCard(dare: dareProv.feedDares[index]),
+                                ),
                               );
                             },
                             childCount: dareProv.feedDares.length + 1,

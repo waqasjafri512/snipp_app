@@ -397,11 +397,11 @@ class DareCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: _buildFBActionButton(
-                        icon: dare['is_liked'] == true ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
-                        label: 'Like',
-                        color: dare['is_liked'] == true ? Colors.blue : (isDark ? Colors.white70 : Colors.grey[700]!),
+                      child: AnimatedLikeButton(
+                        isLiked: dare['is_liked'] == true,
                         onTap: () => _handleLike(context),
+                        color: Colors.blue,
+                        unlikedColor: isDark ? Colors.white70 : Colors.grey[700]!,
                       ),
                     ),
                     Expanded(
@@ -438,9 +438,8 @@ class DareCard extends StatelessWidget {
   }
 
   Widget _buildFBActionButton({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
-    return InkWell(
+    return _BouncingButton(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -549,5 +548,112 @@ class DareCard extends StatelessWidget {
     } catch (e) {
       return '';
     }
+  }
+}
+
+class _BouncingButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _BouncingButton({required this.child, required this.onTap});
+
+  @override
+  State<_BouncingButton> createState() => _BouncingButtonState();
+}
+
+class _BouncingButtonState extends State<_BouncingButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class AnimatedLikeButton extends StatefulWidget {
+  final bool isLiked;
+  final VoidCallback onTap;
+  final Color color;
+  final Color unlikedColor;
+  
+  const AnimatedLikeButton({
+    super.key,
+    required this.isLiked,
+    required this.onTap,
+    required this.color,
+    required this.unlikedColor,
+  });
+
+  @override
+  State<AnimatedLikeButton> createState() => _AnimatedLikeButtonState();
+}
+
+class _AnimatedLikeButtonState extends State<AnimatedLikeButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4).chain(CurveTween(curve: Curves.easeOut)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 50),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(AnimatedLikeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLiked != oldWidget.isLiked && widget.isLiked) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _BouncingButton(
+      onTap: widget.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ScaleTransition(
+              scale: _scaleAnimation,
+              child: Icon(
+                widget.isLiked ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined, 
+                color: widget.isLiked ? widget.color : widget.unlikedColor, 
+                size: 20
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('Like', style: GoogleFonts.plusJakartaSans(
+              color: widget.isLiked ? widget.color : widget.unlikedColor, 
+              fontSize: 14,
+              fontWeight: widget.isLiked ? FontWeight.w700 : FontWeight.w600
+            )),
+          ],
+        ),
+      ),
+    );
   }
 }

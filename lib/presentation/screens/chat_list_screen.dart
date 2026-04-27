@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/chat_provider.dart';
+import '../providers/group_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../widgets/staggered_animation.dart';
 import 'chat_detail_screen.dart';
+import 'group_detail_screen.dart';
+import 'create_group_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -26,8 +30,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final authProv = Provider.of<AuthProvider>(context, listen: false);
       if (authProv.user != null) {
         final chatProv = Provider.of<ChatProvider>(context, listen: false);
+        final groupProv = Provider.of<GroupProvider>(context, listen: false);
         chatProv.initSocket(authProv.user!['id']);
         chatProv.fetchConversations();
+        groupProv.fetchGroups();
       }
     });
   }
@@ -165,17 +171,87 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               child: CircularProgressIndicator(color: theme.primaryStart),
                             ))
                           else if (chatProv.conversations.isEmpty)
-                            Center(child: Padding(
-                              padding: const EdgeInsets.all(40),
-                              child: Text('No messages yet', style: TextStyle(color: theme.textMain)),
-                            ))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? Colors.white10 : Colors.grey[100],
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.chat_bubble_outline_rounded, size: 40, color: theme.primaryStart.withOpacity(0.5)),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    'No messages yet',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: theme.textMain,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Start a conversation or create a new group to chat with your friends.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.white54 : AppColors.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
                           else
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               child: Column(
-                                children: chatProv.conversations.map((conv) => _buildChatItem(conv, theme, isDark)).toList(),
+                                children: chatProv.conversations.asMap().entries.map((entry) {
+                                  return StaggeredListAnimation(
+                                    index: entry.key,
+                                    child: _buildChatItem(entry.value, theme, isDark),
+                                  );
+                                }).toList(),
                               ),
                             ),
+
+                          // Groups Section
+                          Consumer<GroupProvider>(
+                            builder: (context, groupProv, child) {
+                              if (groupProv.groups.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+                                    child: Text(
+                                      'GROUPS',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white54 : AppColors.muted,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    child: Column(
+                                      children: groupProv.groups.asMap().entries.map((entry) {
+                                        return StaggeredListAnimation(
+                                          index: entry.key + chatProv.conversations.length,
+                                          child: _buildGroupItem(entry.value, theme, isDark),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                           const SizedBox(height: 100),
                         ],
                       );
@@ -184,6 +260,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ),
               ],
             ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateGroupScreen()),
+              );
+            },
+            backgroundColor: theme.primaryStart,
+            icon: const Icon(Icons.group_add_rounded, color: Colors.white),
+            label: Text('New Group', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         );
       },
@@ -229,7 +316,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildChatItem(Map<String, dynamic> conv, AppTheme theme, bool isDark) {
-    bool isUnread = conv['is_read'] == false;
+    bool isUnread = (conv['unread_count'] ?? 0) > 0;
     int idx = conv['other_user_id'] % 5;
 
     final displayName = conv['full_name'] ?? conv['username'] ?? 'User';
@@ -310,6 +397,76 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupItem(Map<String, dynamic> group, AppTheme theme, bool isDark) {
+    int idx = group['id'] % 5;
+    final displayName = group['name'] ?? 'Group';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GroupDetailScreen(
+              groupId: group['id'],
+              groupName: displayName,
+              groupAvatar: group['avatar_url'],
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : const Color(0xFFF2EFFF))),
+        ),
+        child: Row(
+          children: [
+            _buildAvatarWithStatus(idx, theme, isDark, isOnline: false, size: 52, initial: displayName[0].toUpperCase()),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        displayName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: theme.textMain,
+                        ),
+                      ),
+                      Text(
+                        _getTimeAgo(group['last_message_time']),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: isDark ? Colors.white54 : AppColors.muted,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    group['last_message'] ?? 'No messages yet',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: isDark ? Colors.white54 : AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

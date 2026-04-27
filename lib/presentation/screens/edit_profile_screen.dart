@@ -35,6 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _coverUrl;
   bool _isAvatarUploading = false;
   bool _isCoverUploading = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -120,7 +121,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _saveProfile() async {
+    if (_isSaving) return;
     if (_formKey.currentState!.validate()) {
+      setState(() => _isSaving = true);
+      
       final profileProv = Provider.of<ProfileProvider>(context, listen: false);
       final success = await profileProv.updateProfile({
         'full_name': _nameController.text.trim(),
@@ -139,6 +143,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
         Navigator.pop(context);
       } else if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(profileProv.error ?? 'Update failed')),
         );
@@ -177,10 +182,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           color: theme.textMain,
                         ),
                       ),
-                      GestureDetector(
-                        onTap: _saveProfile,
-                        child: Icon(Icons.check_rounded, color: theme.primaryStart, size: 26),
-                      ),
+                      _isSaving 
+                        ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: theme.primaryStart, strokeWidth: 2))
+                        : GestureDetector(
+                            onTap: _saveProfile,
+                            child: Icon(Icons.check_rounded, color: theme.primaryStart, size: 28),
+                          ),
                     ],
                   ),
                 ),

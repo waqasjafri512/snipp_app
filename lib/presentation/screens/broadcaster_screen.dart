@@ -135,6 +135,12 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
     SocketService().emit('leaveStream', widget.channelName);
     _engine?.release();
     _chatScrollController.dispose();
+    
+    // Reset viewer count in provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<LiveProvider>(context, listen: false).resetViewerCount();
+    });
+    
     super.dispose();
   }
 
@@ -196,11 +202,18 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           color: Colors.black.withOpacity(0.3),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
-                              SizedBox(width: 6),
-                              Text('1.2K', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              const Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Consumer<LiveProvider>(
+                                builder: (context, liveProv, _) {
+                                  return Text(
+                                    '${liveProv.viewerCount}',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),

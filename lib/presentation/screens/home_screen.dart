@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  bool _hideVerificationBanner = false;
 
   final List<Widget> _screens = [
     const FeedScreen(),
@@ -73,9 +74,86 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Scaffold(
           backgroundColor: theme.background,
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: _screens,
+          body: Column(
+            children: [
+              Consumer<AuthProvider>(
+                builder: (context, auth, _) {
+                  if (auth.user == null || auth.user!['is_verified'] == true || _hideVerificationBanner) {
+                    return const SizedBox.shrink();
+                  }
+                  return SafeArea(
+                    bottom: false,
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: theme.primaryStart.withOpacity(0.2)),
+                        boxShadow: isDark ? null : [
+                          BoxShadow(color: theme.primaryStart.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: theme.primaryStart.withOpacity(0.1), shape: BoxShape.circle),
+                            child: Icon(Icons.mark_email_unread_rounded, color: theme.primaryStart, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Verify Email',
+                                  style: GoogleFonts.plusJakartaSans(color: theme.textMain, fontSize: 13, fontWeight: FontWeight.w800),
+                                ),
+                                Text(
+                                  'Required for password resets.',
+                                  style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white54 : Colors.grey[600], fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final result = await Provider.of<AuthProvider>(context, listen: false).resendVerification();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'])));
+                              }
+                            },
+                            style: TextButton.styleFrom(
+                              backgroundColor: theme.primaryStart,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                              minimumSize: const Size(0, 32),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Send Link', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(() => _hideVerificationBanner = true),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white34 : Colors.grey[400]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: _screens,
+                ),
+              ),
+            ],
           ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
@@ -123,24 +201,34 @@ class _HomeScreenState extends State<HomeScreen> {
       child: GestureDetector(
         onTap: () => _onItemTapped(index),
         behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSelected ? selectedIcon : unselectedIcon,
-              size: 24,
-              color: isSelected ? theme.primaryStart : (isDark ? Colors.white54 : Colors.black.withOpacity(0.6)),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? theme.primaryStart : (isDark ? Colors.white38 : Colors.black.withOpacity(0.4)),
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutBack,
+          tween: Tween<double>(begin: 1.0, end: isSelected ? 1.15 : 1.0),
+          builder: (context, scale, child) {
+            return Transform.scale(
+              scale: scale,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isSelected ? selectedIcon : unselectedIcon,
+                    size: 24,
+                    color: isSelected ? theme.primaryStart : (isDark ? Colors.white54 : Colors.black.withOpacity(0.6)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                      color: isSelected ? theme.primaryStart : (isDark ? Colors.white38 : Colors.black.withOpacity(0.4)),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

@@ -141,6 +141,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
     _engine?.release();
     _messageController.dispose();
     _chatScrollController.dispose();
+    
+    // Reset viewer count in provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<LiveProvider>(context, listen: false).resetViewerCount();
+    });
+    
     super.dispose();
   }
 
@@ -202,6 +208,17 @@ class _ViewerScreenState extends State<ViewerScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   const Text('Live', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 10),
+                                  const SizedBox(width: 4),
+                                  Consumer<LiveProvider>(
+                                    builder: (context, liveProv, _) {
+                                      return Text(
+                                        '${liveProv.viewerCount}',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                                      );
+                                    },
+                                  ),
                                 ],
                               ),
                             ],

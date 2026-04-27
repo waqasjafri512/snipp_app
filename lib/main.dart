@@ -10,6 +10,7 @@ import 'presentation/providers/search_provider.dart';
 import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/live_provider.dart';
 import 'presentation/providers/story_provider.dart';
+import 'presentation/providers/group_provider.dart';
 import 'presentation/screens/splash_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/signup_screen.dart';
@@ -38,6 +39,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => LiveProvider()),
         ChangeNotifierProvider(create: (_) => StoryProvider()),
+        ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const MyApp(),
@@ -108,8 +110,6 @@ class MyApp extends StatelessWidget {
           ),
           home: const SplashScreen(),
           routes: {
-            AppConstants.loginRoute: (context) => const LoginScreen(),
-            AppConstants.signupRoute: (context) => const SignupScreen(),
             AppConstants.homeRoute: (context) => const HomeScreen(),
             AppConstants.profileRoute: (context) => const ProfileScreen(),
             AppConstants.createDareRoute: (context) => const CreateDareScreen(),
@@ -124,6 +124,28 @@ class MyApp extends StatelessWidget {
                 title: args['title'],
               );
             },
+          },
+          onGenerateRoute: (settings) {
+            if (settings.name == AppConstants.loginRoute || settings.name == AppConstants.signupRoute) {
+              return PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return settings.name == AppConstants.loginRoute 
+                    ? const LoginScreen() 
+                    : const SignupScreen();
+                },
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeInOut,
+                    )),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 400),
+              );
+            }
+            return null;
           },
         );
       },

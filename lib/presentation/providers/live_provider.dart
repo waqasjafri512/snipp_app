@@ -2,17 +2,38 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../data/repositories/api_service.dart';
+import '../../data/services/socket_service.dart';
 
 class LiveProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   
+  LiveProvider() {
+    _initSocketListeners();
+  }
+
+  void _initSocketListeners() {
+    SocketService().eventStream.listen((event) {
+      if (event['event'] == 'viewerCount') {
+        _viewerCount = event['data']['count'] ?? 0;
+        notifyListeners();
+      }
+    });
+  }
+
   bool _isLoading = false;
   List<dynamic> _activeStreams = [];
   String? _error;
+  int _viewerCount = 0;
 
   bool get isLoading => _isLoading;
   List<dynamic> get activeStreams => _activeStreams;
   String? get error => _error;
+  int get viewerCount => _viewerCount;
+
+  void resetViewerCount() {
+    _viewerCount = 0;
+    notifyListeners();
+  }
 
   void _setLoading(bool value) {
     _isLoading = value;

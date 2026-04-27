@@ -165,6 +165,9 @@ class ProfileProvider with ChangeNotifier {
   
   bool isFollowing(int userId, {bool fallback = false}) => _followingStatus[userId] ?? fallback;
 
+  List<dynamic> _blockedUsers = [];
+  List<dynamic> get blockedUsers => _blockedUsers;
+
   // Follow/Unfollow
   Future<void> toggleFollow(int userId) async {
     final bool currentStatus = _followingStatus[userId] ?? (_userProfile != null && _userProfile!['id'] == userId ? (_userProfile!['is_following'] ?? false) : false);
@@ -201,5 +204,44 @@ class ProfileProvider with ChangeNotifier {
   void _updateFollowStatus(int userId, bool status) {
     _followingStatus[userId] = status;
     notifyListeners();
+  }
+
+  // Blocking logic
+  Future<bool> blockUser(int userId) async {
+    try {
+      final response = await _apiService.post('/profile/block/$userId', {});
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unblockUser(int userId) async {
+    try {
+      final response = await _apiService.post('/profile/unblock/$userId', {});
+      if (response.statusCode == 200) {
+        _blockedUsers.removeWhere((u) => u['id'] == userId);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> fetchBlockedUsers() async {
+    _setLoading(true);
+    try {
+      final response = await _apiService.get('/profile/settings/blocked');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        _blockedUsers = data['data']['blockedUsers'];
+      }
+    } catch (e) {
+      print('Fetch blocked users error: $e');
+    } finally {
+      _setLoading(false);
+    }
   }
 }

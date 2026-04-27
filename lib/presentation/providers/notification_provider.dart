@@ -6,10 +6,18 @@ import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
 
 class NotificationProvider with ChangeNotifier {
+  static final NotificationProvider _instance = NotificationProvider._internal();
+  factory NotificationProvider() => _instance;
+  NotificationProvider._internal() {
+    _initSocketListeners();
+  }
+
   final ApiService _apiService = ApiService();
   
-  NotificationProvider() {
-    _initSocketListeners();
+  int? _currentUserId;
+
+  void setUserId(int? userId) {
+    _currentUserId = userId;
   }
 
   void _initSocketListeners() {
@@ -17,6 +25,11 @@ class NotificationProvider with ChangeNotifier {
       if (event['event'] == 'newNotification') {
         final data = event['data'];
         if (data != null) {
+          // Filter out self-notifications if actor_id matches current user
+          if (_currentUserId != null && data['actor_id'] == _currentUserId) {
+            return;
+          }
+
           _notifications.insert(0, {
             'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch,
             'type': (data['type'] ?? 'info').toString(),
@@ -125,6 +138,15 @@ class NotificationProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Mark all read error: $e');
+    }
+  }
+
+  // FCM Token Management
+  Future<void> saveFcmToken(String token) async {
+    try {
+      await _apiService.post('/profile/fcm-token', {'token': token});
+    } catch (e) {
+      print('Save FCM token error: $e');
     }
   }
 }

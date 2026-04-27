@@ -128,12 +128,18 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                       );
                     }
 
+                    // Organize comments: Top-level and their replies
+                    final topLevelComments = dareProv.comments.where((c) => c['parent_id'] == null).toList();
+                    final replies = dareProv.comments.where((c) => c['parent_id'] != null).toList();
+
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                      itemCount: dareProv.comments.length,
+                      itemCount: topLevelComments.length,
                       itemBuilder: (context, index) {
-                        final comment = dareProv.comments[index];
-                        return _buildCommentItem(comment, theme, isDark);
+                        final comment = topLevelComments[index];
+                        final commentReplies = replies.where((r) => r['parent_id'] == comment['id']).toList();
+                        
+                        return _buildCommentThread(comment, commentReplies, theme, isDark);
                       },
                     );
                   },
@@ -218,12 +224,52 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
     );
   }
 
-  Widget _buildCommentItem(Map<String, dynamic> comment, AppTheme theme, bool isDark) {
-    bool isReply = comment['parent_id'] != null;
+  final Map<int, bool> _expandedThreads = {};
+
+  Widget _buildCommentThread(Map<String, dynamic> comment, List<dynamic> replies, AppTheme theme, bool isDark) {
+    bool isExpanded = _expandedThreads[comment['id']] ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCommentItem(comment, theme, isDark),
+        if (replies.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 46, bottom: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _expandedThreads[comment['id']] = !isExpanded),
+              child: Row(
+                children: [
+                  Container(
+                    width: 20,
+                    height: 1,
+                    color: theme.primaryStart.withOpacity(0.3),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isExpanded ? 'Hide replies' : 'View ${replies.length} replies',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: theme.primaryStart,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            ...replies.map((reply) => _buildCommentItem(reply, theme, isDark, isReply: true)).toList(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCommentItem(Map<String, dynamic> comment, AppTheme theme, bool isDark, {bool isReply = false}) {
     int idx = comment['id'] % 5;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 16, left: isReply ? 40 : 0),
+      padding: EdgeInsets.only(bottom: 16, left: isReply ? 46 : 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -290,18 +336,20 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () => _handleReply(comment['id'], comment['username']),
-                        child: Text(
-                          'Reply',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11, 
-                            color: theme.primaryStart,
-                            fontWeight: FontWeight.w700,
+                      if (!isReply) ...[
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: () => _handleReply(comment['id'], comment['username']),
+                          child: Text(
+                            'Reply',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11, 
+                              color: theme.primaryStart,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -358,3 +406,4 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
     }
   }
 }
+

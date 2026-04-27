@@ -28,7 +28,8 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
   File? _selectedMedia;
   String? _mediaUrl;
   String? _mediaType;
-  bool _isUploading = false;
+  bool _isMediaUploading = false;
+  bool _isSubmitting = false;
   String _postType = 'dare'; // 'dare' or 'general'
 
   final List<String> _categories = ["🔥 Trending", "💪 Fitness", "😂 Funny", "🎨 Creative", "🌊 Outdoors", "🍕 Food"];
@@ -52,10 +53,10 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
   }
 
   void _handleSubmit() async {
-    if (_isUploading) return; 
+    if (_isMediaUploading || _isSubmitting) return; 
     
     if (_formKey.currentState!.validate()) {
-      setState(() => _isUploading = true);
+      setState(() => _isSubmitting = true);
       
       final dareProv = Provider.of<DareProvider>(context, listen: false);
       final authProv = Provider.of<AuthProvider>(context, listen: false);
@@ -84,13 +85,13 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
           );
           Navigator.pop(context);
         } else if (mounted) {
-          setState(() => _isUploading = false);
+          setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(dareProv.error ?? 'Failed to process post')),
           );
         }
       } catch (e) {
-        if (mounted) setState(() => _isUploading = false);
+        if (mounted) setState(() => _isSubmitting = false);
       }
     }
   }
@@ -215,7 +216,9 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
                                       ),
                                     ],
                                   )
-                                : Column(
+                                : _isMediaUploading
+                                    ? Center(child: CircularProgressIndicator(color: theme.primaryStart))
+                                    : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Container(
@@ -441,8 +444,9 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
                           children: [
                             Expanded(
                               child: GradientButton(
-                                text: _isUploading ? 'Posting...' : (_postType == 'dare' ? '🚀 Post Dare' : '📣 Publish Post'),
-                                onPressed: _isUploading ? null : _handleSubmit,
+                                text: _postType == 'dare' ? '🚀 Post Dare' : '📣 Publish Post',
+                                onPressed: (_isMediaUploading || _isSubmitting) ? null : _handleSubmit,
+                                isLoading: _isSubmitting,
                                 borderRadius: 20,
                                 height: 60,
                               ),
@@ -597,7 +601,7 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
 
     setState(() {
       _selectedMedia = File(file.path);
-      _isUploading = true;
+      _isMediaUploading = true;
     });
 
     try {
@@ -608,16 +612,16 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
         setState(() {
           _mediaUrl = data['data']['mediaUrl'];
           _mediaType = data['data']['mediaType'];
-          _isUploading = false;
+          _isMediaUploading = false;
         });
       } else {
-        setState(() => _isUploading = false);
+        setState(() => _isMediaUploading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload failed. Try again.')));
         }
       }
     } catch (e) {
-      setState(() => _isUploading = false);
+      setState(() => _isMediaUploading = false);
     }
   }
 }

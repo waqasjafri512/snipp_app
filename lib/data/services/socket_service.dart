@@ -29,6 +29,7 @@ class SocketService {
 
     // Universal message handler
     _socket!.on('message', (data) => _eventController.add({'event': 'message', 'data': data}));
+    _socket!.on('messagesRead', (data) => _eventController.add({'event': 'messagesRead', 'data': data}));
     
     // Dare events
     _socket!.on('newDare', (data) => _eventController.add({'event': 'newDare', 'data': data}));
@@ -41,6 +42,10 @@ class SocketService {
     // Live Stream events
     _socket!.on('streamMessage', (data) => _eventController.add({'event': 'streamMessage', 'data': data}));
     _socket!.on('streamReaction', (data) => _eventController.add({'event': 'streamReaction', 'data': data}));
+    _socket!.on('viewerCount', (data) => _eventController.add({'event': 'viewerCount', 'data': data}));
+
+    // Presence events
+    _socket!.on('userStatus', (data) => _eventController.add({'event': 'userStatus', 'data': data}));
 
     _socket!.onDisconnect((_) => print('Socket unified disconnected'));
   }

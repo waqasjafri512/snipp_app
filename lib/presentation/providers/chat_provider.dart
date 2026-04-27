@@ -22,12 +22,27 @@ class ChatProvider with ChangeNotifier {
           final exists = _messages.any((m) => m['id'] == message['id']);
           if (!exists) {
             _messages.insert(0, message);
+            // If we are active in this chat, mark as read immediately
+            if (message['sender_id'] == _activeChatUserId) {
+              markAsRead(_activeChatUserId!);
+            }
             notifyListeners();
           }
         }
         
         // Update conversations list
         _updateConversationsLocally(message);
+      } else if (event['event'] == 'messagesRead') {
+        final data = event['data'] as Map<String, dynamic>;
+        // If the other user (active chat) read our messages
+        if (_activeChatUserId == data['readBy']) {
+          for (var i = 0; i < _messages.length; i++) {
+            if (_messages[i]['receiver_id'] == data['readBy']) {
+              _messages[i]['is_read'] = true;
+            }
+          }
+          notifyListeners();
+        }
       }
     });
   }
@@ -81,6 +96,8 @@ class ChatProvider with ChangeNotifier {
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['success']) {
         _messages = data['data']['history'];
+        // Since we loaded the history, mark them as read locally too
+        _updateConversationReadStatus(otherUserId);
       }
     } catch (e) {
       _error = 'Failed to load messages';
@@ -89,13 +106,62 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  void _updateConversationReadStatus(int otherUserId) {
+    final index = _conversations.indexWhere((c) => c['other_user_id'] == otherUserId);
+    if (index != -1) {
+      _conversations[index]['unread_count'] = 0;
+      notifyListeners();
+    }
+  }
+
+  // Mark messages as read
+  Future<void> markAsRead(int otherUserId) async {
+    try {
+      await _apiService.post('/messages/mark-read/$otherUserId', {});
+      _updateConversationReadStatus(otherUserId);
+    } catch (e) {
+      print('MarkRead error: $e');
+    }
+  }
+
+  // Total unread messages across all conversations
+  int get totalUnreadCount {
+    int count = 0;
+    for (var conv in _conversations) {
+      count += (conv['unread_count'] as int? ?? 0);
+    }
+    return count;
+  }
+
   // Send Message
-  void sendMessage(int senderId, int receiverId, String content) {
+  void sendMessage(int senderId, int receiverId, String content, {String type = 'text', String? mediaUrl}) {
     SocketService().emit('sendMessage', {
       'senderId': senderId,
       'receiverId': receiverId,
       'content': content,
+      'type': type,
+      'mediaUrl': mediaUrl,
     });
+  }
+
+  // Upload and Send Media
+  Future<bool> sendMediaMessage(int senderId, int receiverId, String filePath) async {
+    try {
+      final response = await _apiService.uploadFile('/messages/upload', filePath, 'media');
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success']) {
+        final mediaUrl = data['data']['mediaUrl'];
+        final type = data['data']['type']; // 'image' or 'video'
+        
+        sendMessage(senderId, receiverId, '[Media Message]', type: type, mediaUrl: mediaUrl);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Media upload error: $e');
+      return false;
+    }
   }
 
   void clearActiveChat() {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
+import '../providers/notification_provider.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -41,6 +42,7 @@ class AuthProvider with ChangeNotifier {
         await _apiService.saveToken(data['data']['token']);
         _user = data['data']['user'];
         SocketService().connect(_user!['id']);
+        NotificationProvider().setUserId(_user!['id']);
         _setLoading(false);
         return true;
       } else {
@@ -70,6 +72,7 @@ class AuthProvider with ChangeNotifier {
         await _apiService.saveToken(data['data']['token']);
         _user = data['data']['user'];
         SocketService().connect(_user!['id']);
+        NotificationProvider().setUserId(_user!['id']);
         _setLoading(false);
         return true;
       } else {
@@ -96,6 +99,7 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200 && data['success']) {
         _user = data['data']['user'];
         SocketService().connect(_user!['id']);
+        NotificationProvider().setUserId(_user!['id']);
         notifyListeners();
         return true;
       } else {
@@ -110,7 +114,51 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     await _apiService.deleteToken();
     SocketService().disconnect();
+    NotificationProvider().setUserId(null);
     _user = null;
     notifyListeners();
+  }
+
+  // Password Recovery
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    _setLoading(true);
+    try {
+      final response = await _apiService.post('/auth/forgot-password', {'email': email});
+      final data = jsonDecode(response.body);
+      _setLoading(false);
+      return {'success': data['success'], 'message': data['message']};
+    } catch (e) {
+      _setLoading(false);
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPassword(String token, String newPassword) async {
+    _setLoading(true);
+    try {
+      final response = await _apiService.post('/auth/reset-password', {
+        'token': token,
+        'newPassword': newPassword
+      });
+      final data = jsonDecode(response.body);
+      _setLoading(false);
+      return {'success': data['success'], 'message': data['message']};
+    } catch (e) {
+      _setLoading(false);
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> resendVerification() async {
+    _setLoading(true);
+    try {
+      final response = await _apiService.post('/auth/resend-verification', {});
+      final data = jsonDecode(response.body);
+      _setLoading(false);
+      return {'success': data['success'], 'message': data['message']};
+    } catch (e) {
+      _setLoading(false);
+      return {'success': false, 'message': 'Connection error'};
+    }
   }
 }

@@ -70,4 +70,35 @@ class StoryProvider with ChangeNotifier {
       return false;
     }
   }
+
+  // Story Interactions
+  Future<void> viewStory(int storyId) async {
+    try {
+      await _apiService.post('/stories/$storyId/view', {});
+    } catch (e) {
+      print('ViewStory error: $e');
+    }
+  }
+
+  Future<bool> reactToStory(int storyId, String emoji) async {
+    try {
+      final response = await _apiService.post('/stories/$storyId/react', {'emoji': emoji});
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getStoryInteractions(int storyId) async {
+    try {
+      final response = await _apiService.get('/stories/$storyId/interactions');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
 }
