@@ -24,8 +24,11 @@ class ApiService {
   }
 
   // POST Request
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+  Future<http.Response> post(String endpoint, Map<String, dynamic> body, {Map<String, String>? customHeaders}) async {
     final headers = await _getHeaders();
+    if (customHeaders != null) {
+      headers.addAll(customHeaders);
+    }
     return await http.post(
       Uri.parse('$_baseUrl$endpoint'),
       headers: headers,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
+import '../../data/services/notification_service.dart';
 import '../providers/notification_provider.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -43,6 +44,10 @@ class AuthProvider with ChangeNotifier {
         _user = data['data']['user'];
         SocketService().connect(_user!['id']);
         NotificationProvider().setUserId(_user!['id']);
+        
+        // Sync FCM Token for Push Notifications
+        NotificationService().updateToken();
+        
         return true;
       }
       _error = data['message'] ?? 'Failed to sync with backend';

@@ -28,12 +28,22 @@ import 'presentation/screens/viewer_screen.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/theme_center_screen.dart';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'data/services/notification_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
     await Firebase.initializeApp();
     print('Firebase initialized successfully.');
+    
+    // Initialize Notification Service
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    
+    // Register Background Handler
+    FirebaseMessaging.onBackgroundMessage(NotificationService.firebaseMessagingBackgroundHandler);
   } catch (e) {
     print('\n======================================================');
     print('🚨 FIREBASE NOT CONFIGURED YET!');

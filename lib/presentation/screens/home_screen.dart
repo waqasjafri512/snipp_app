@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: () => setState(() => _hideVerificationBanner = true),
                             child: Padding(
                               padding: const EdgeInsets.all(4),
-                              child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white34 : Colors.grey[400]),
+                              child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white54 : Colors.grey[400]),
                             ),
                           ),
                         ],
