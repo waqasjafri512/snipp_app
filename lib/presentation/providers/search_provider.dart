@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
 
 class SearchProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  Timer? _debounceTimer;
   
   bool _isLoading = false;
   List<dynamic> _searchResultsUsers = [];
@@ -24,8 +26,10 @@ class SearchProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Global Search
+  // Global Search with debounce
   Future<void> search(String query) async {
+    _debounceTimer?.cancel();
+    
     if (query.isEmpty) {
       _searchResultsUsers = [];
       _searchResultsDares = [];
@@ -33,23 +37,26 @@ class SearchProvider with ChangeNotifier {
       return;
     }
 
-    _setLoading(true);
-    _error = null;
-    try {
-      final response = await _apiService.get('/search?q=$query');
-      final data = jsonDecode(response.body);
+    // Debounce: wait 300ms after user stops typing
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      _setLoading(true);
+      _error = null;
+      try {
+        final response = await _apiService.get('/search?q=$query');
+        final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200 && data['success']) {
-        _searchResultsUsers = data['data']['users'];
-        _searchResultsDares = data['data']['dares'];
-      } else {
-        _error = data['message'] ?? 'Search failed';
+        if (response.statusCode == 200 && data['success']) {
+          _searchResultsUsers = data['data']['users'];
+          _searchResultsDares = data['data']['dares'];
+        } else {
+          _error = data['message'] ?? 'Search failed';
+        }
+      } catch (e) {
+        _error = 'Connection error';
+      } finally {
+        _setLoading(false);
       }
-    } catch (e) {
-      _error = 'Connection error';
-    } finally {
-      _setLoading(false);
-    }
+    });
   }
 
   // Get Trending
@@ -82,5 +89,11 @@ class SearchProvider with ChangeNotifier {
     } catch (e) {
       print('Trending creators error: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }

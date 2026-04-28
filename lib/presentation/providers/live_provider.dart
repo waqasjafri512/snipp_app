@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -6,13 +7,15 @@ import '../../data/services/socket_service.dart';
 
 class LiveProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  StreamSubscription? _socketSub;
   
   LiveProvider() {
     _initSocketListeners();
   }
 
   void _initSocketListeners() {
-    SocketService().eventStream.listen((event) {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'viewerCount') {
         _viewerCount = event['data']['count'] ?? 0;
         notifyListeners();
@@ -96,5 +99,11 @@ class LiveProvider with ChangeNotifier {
     final camera = await Permission.camera.request();
     final mic = await Permission.microphone.request();
     return camera.isGranted && mic.isGranted;
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 }

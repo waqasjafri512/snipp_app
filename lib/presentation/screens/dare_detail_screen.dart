@@ -250,124 +250,128 @@ class _DareDetailScreenState extends State<DareDetailScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Accept Button
-                      Consumer<DareProvider>(
-                        builder: (context, dareProv, _) {
-                          bool isAccepted = dare['is_accepted'] == true || dareProv.userParticipatedDares.any((d) => d['id'] == dare['id']);
-                          
-                          return GradientButton(
-                            text: isAccepted ? '🎯 Already Accepted' : '🎯 Accept This Dare',
-                            onPressed: isAccepted ? null : () async {
-                              final success = await dareProv.acceptDare(dare['id']);
-                              if (success && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Dare Accepted! Going Live... 🔥')),
-                                );
-                                
-                                // Navigate to Live directly
-                                Navigator.pushNamed(
-                                  context, 
-                                  '/broadcaster', 
-                                  arguments: {
-                                    'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
-                                    'title': 'Performing: ${dare['title']}',
-                                    'dareId': dare['id'],
-                                  }
-                                );
-                              }
-                            },
-                            borderRadius: 20,
-                            height: 64,
-                            opacity: isAccepted ? 0.7 : 1.0,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
+                      // Accept Button (Only for Dares)
+                      if (dare['post_type'] != 'general')
+                        Consumer<DareProvider>(
+                          builder: (context, dareProv, _) {
+                            bool isAccepted = dare['is_accepted'] == true || dareProv.userParticipatedDares.any((d) => d['id'] == dare['id']);
+                            
+                            return GradientButton(
+                              text: isAccepted ? '🎯 Already Accepted' : '🎯 Accept This Dare',
+                              onPressed: isAccepted ? null : () async {
+                                final success = await dareProv.acceptDare(dare['id']);
+                                if (success && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Dare Accepted! Going Live... 🔥')),
+                                  );
+                                  
+                                  // Navigate to Live directly
+                                  Navigator.pushNamed(
+                                    context, 
+                                    '/broadcaster', 
+                                    arguments: {
+                                      'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
+                                      'title': 'Performing: ${dare['title']}',
+                                      'dareId': dare['id'],
+                                    }
+                                  );
+                                }
+                              },
+                              borderRadius: 20,
+                              height: 64,
+                              opacity: isAccepted ? 0.7 : 1.0,
+                            );
+                          },
+                        ),
+                      if (dare['post_type'] != 'general')
+                        const SizedBox(height: 16),
 
-                      // Upload Proof Section
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? theme.primaryStart.withOpacity(0.1) : const Color(0xFFFAF9FF),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: theme.primaryStart.withOpacity(0.2),
-                            width: 2,
+                      // Upload Proof Section (Only for Dares)
+                      if (dare['post_type'] != 'general')
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? theme.primaryStart.withOpacity(0.1) : const Color(0xFFFAF9FF),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: theme.primaryStart.withOpacity(0.2),
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Already completed it?',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: theme.primaryStart,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Upload your video proof and claim credit',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white54 : AppColors.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildFullWidthOutlineButton(
+                                'Upload Completion Video',
+                                theme,
+                                isDark,
+                                onTap: () => _uploadProof(context, theme),
+                              ),
+                              const SizedBox(height: 10),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context, 
+                                    '/broadcaster', 
+                                    arguments: {
+                                      'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
+                                      'title': 'Performing: ${dare['title']}',
+                                    }
+                                  );
+                                },
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: isDark ? null : [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF006E).withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.sensors_rounded, color: Colors.white, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Perform Dare Live',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Already completed it?',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                color: theme.primaryStart,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Upload your video proof and claim credit',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                color: isDark ? Colors.white54 : AppColors.muted,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _buildFullWidthOutlineButton(
-                              'Upload Completion Video',
-                              theme,
-                              isDark,
-                              onTap: () => _uploadProof(context, theme),
-                            ),
-                            const SizedBox(height: 10),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.pushNamed(
-                                  context, 
-                                  '/broadcaster', 
-                                  arguments: {
-                                    'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
-                                    'title': 'Performing: ${dare['title']}',
-                                  }
-                                );
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: isDark ? null : [
-                                    BoxShadow(
-                                      color: const Color(0xFFFF006E).withOpacity(0.3),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.sensors_rounded, color: Colors.white, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Perform Dare Live',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      if (dare['post_type'] != 'general')
+                        const SizedBox(height: 24),
                       // Comments Header
                       Text(
                         'Comments (${dare['comments_count'] ?? 0})',

@@ -43,7 +43,7 @@ class AuthProvider with ChangeNotifier {
         await _apiService.saveToken(data['data']['token']);
         _user = data['data']['user'];
         SocketService().connect(_user!['id']);
-        NotificationProvider().setUserId(_user!['id']);
+        NotificationProvider.setUserId(_user!['id']);
         
         // Sync FCM Token for Push Notifications
         NotificationService().updateToken();
@@ -167,7 +167,7 @@ class AuthProvider with ChangeNotifier {
         } catch (e) {}
         
         SocketService().connect(_user!['id']);
-        NotificationProvider().setUserId(_user!['id']);
+        NotificationProvider.setUserId(_user!['id']);
         notifyListeners();
         return true;
       } else {
@@ -186,7 +186,7 @@ class AuthProvider with ChangeNotifier {
     
     await _apiService.deleteToken();
     SocketService().disconnect();
-    NotificationProvider().setUserId(null);
+    NotificationProvider.setUserId(null);
     _user = null;
     notifyListeners();
   }
@@ -227,6 +227,35 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       _setLoading(false);
       return {'success': false, 'message': 'Failed to send verification.'};
+    }
+  }
+  Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+    _setLoading(true);
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      // Re-authenticate user
+      AuthCredential credential = EmailAuthProvider.credential(email: user.email!, password: currentPassword);
+      await user.reauthenticateWithCredential(credential);
+      
+      // Update password
+      await user.updatePassword(newPassword);
+      
+      // Sync with backend (updates legacy password field if exists)
+      await _apiService.post('/auth/change-password', {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword
+      });
+
+      _setLoading(false);
+      return {'success': true, 'message': 'Password updated successfully!'};
+    } on FirebaseAuthException catch (e) {
+      _setLoading(false);
+      return {'success': false, 'message': e.message ?? 'Failed to update password.'};
+    } catch (e) {
+      _setLoading(false);
+      return {'success': false, 'message': e.toString()};
     }
   }
 }

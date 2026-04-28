@@ -172,7 +172,39 @@ class _UserListScreenState extends State<UserListScreen> {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isDark ? Colors.white24 : AppColors.muted.withOpacity(0.5)),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert_rounded, size: 20, color: isDark ? Colors.white24 : AppColors.muted.withOpacity(0.5)),
+              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+              onSelected: (value) {
+                if (value == 'view') {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(userId: user['id'])));
+                } else if (value == 'unfollow') {
+                  Provider.of<ProfileProvider>(context, listen: false).toggleFollow(user['id']);
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'view',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 18, color: theme.textMain),
+                      const SizedBox(width: 10),
+                      Text('View Profile', style: GoogleFonts.plusJakartaSans(color: theme.textMain)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'unfollow',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_remove_outlined, size: 18, color: Colors.redAccent),
+                      const SizedBox(width: 10),
+                      Text('Unfollow', style: GoogleFonts.plusJakartaSans(color: Colors.redAccent)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

@@ -8,6 +8,7 @@ import '../providers/theme_provider.dart';
 import 'dart:async';
 import '../../core/constants/app_constants.dart';
 import '../../data/services/socket_service.dart';
+import 'call_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final int otherUserId;
@@ -131,6 +132,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
+  void _initiateCall(String type) {
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProv.user!['id'];
+    
+    // Generate a unique channel name for the call
+    final channelName = 'call_${currentUserId}_${widget.otherUserId}_${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Send signal via socket
+    SocketService().emit('callUser', {
+      'senderId': currentUserId,
+      'receiverId': widget.otherUserId,
+      'type': type,
+      'channelName': channelName,
+    });
+
+    // Navigate to Call Screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CallScreen(
+          remoteUserId: widget.otherUserId,
+          remoteUserName: widget.otherUserName,
+          remoteUserAvatar: widget.otherUserAvatar,
+          type: type,
+          channelName: channelName,
+          isIncoming: false,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -200,11 +232,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             actions: [
               GestureDetector(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting Audio Call...'))),
+                onTap: () => _initiateCall('audio'),
                 child: _buildPremiumHeaderIcon(Icons.call_outlined, theme, isDark),
               ),
               GestureDetector(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting Video Call...'))),
+                onTap: () => _initiateCall('video'),
                 child: _buildPremiumHeaderIcon(Icons.videocam_outlined, theme, isDark),
               ),
               const SizedBox(width: 8),

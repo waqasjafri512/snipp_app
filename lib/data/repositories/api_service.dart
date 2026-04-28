@@ -6,6 +6,8 @@ import '../../core/constants/app_constants.dart';
 class ApiService {
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = AppConstants.apiUrl;
+  static const Duration _timeout = Duration(seconds: 15);
+  static const Duration _uploadTimeout = Duration(seconds: 60);
 
   // Headers helper
   Future<Map<String, String>> _getHeaders() async {
@@ -20,7 +22,8 @@ class ApiService {
   // GET Request
   Future<http.Response> get(String endpoint) async {
     final headers = await _getHeaders();
-    return await http.get(Uri.parse('$_baseUrl$endpoint'), headers: headers);
+    return await http.get(Uri.parse('$_baseUrl$endpoint'), headers: headers)
+        .timeout(_timeout);
   }
 
   // POST Request
@@ -33,7 +36,7 @@ class ApiService {
       Uri.parse('$_baseUrl$endpoint'),
       headers: headers,
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
   }
 
   // PUT Request
@@ -43,13 +46,14 @@ class ApiService {
       Uri.parse('$_baseUrl$endpoint'),
       headers: headers,
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
   }
 
   // DELETE Request
   Future<http.Response> delete(String endpoint) async {
     final headers = await _getHeaders();
-    return await http.delete(Uri.parse('$_baseUrl$endpoint'), headers: headers);
+    return await http.delete(Uri.parse('$_baseUrl$endpoint'), headers: headers)
+        .timeout(_timeout);
   }
 
   // Auth specific methods
@@ -76,7 +80,7 @@ class ApiService {
     
     request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
     
-    final streamedResponse = await request.send();
+    final streamedResponse = await request.send().timeout(_uploadTimeout);
     return await http.Response.fromStream(streamedResponse);
   }
 }

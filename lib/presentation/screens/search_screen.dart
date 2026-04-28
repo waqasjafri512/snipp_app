@@ -7,6 +7,7 @@ import '../providers/theme_provider.dart';
 import '../widgets/dare_card.dart';
 import '../../core/constants/app_constants.dart';
 import 'profile_screen.dart';
+import '../widgets/verification_badge.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -252,17 +253,26 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    user['full_name'] ?? user['username'],
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.w700,
-                      color: theme.textMain,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user['full_name'] ?? user['username'],
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.w700,
+                              color: theme.textMain,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        if (user['is_verified'] == true)
+                          const VerificationBadge(size: 10, padding: EdgeInsets.only(left: 2)),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
                   Text(
                     '${user['followers_count'] ?? 0} followers',
                     style: GoogleFonts.plusJakartaSans(
@@ -392,60 +402,69 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildUserTile(Map<String, dynamic> user, AppTheme theme, bool isDark) {
     bool isFollowing = user['is_following'] == true;
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
-            backgroundImage: user['avatar_url'] != null
-                ? NetworkImage(AppConstants.getMediaUrl(user['avatar_url']))
-                : null,
-            child: user['avatar_url'] == null
-                ? Text(
-                    (user['username'] ?? 'U')[0].toUpperCase(), 
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: theme.textMain,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user['full_name'] ?? user['username'],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w700, 
-                    fontSize: 15,
-                    color: theme.textMain,
-                  ),
-                ),
-                Text(
-                  '@${user['username']}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12, 
-                    color: isDark ? Colors.white54 : AppColors.muted,
-                  ),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: user['id']),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+              backgroundImage: user['avatar_url'] != null
+                  ? NetworkImage(AppConstants.getMediaUrl(user['avatar_url']))
+                  : null,
+              child: user['avatar_url'] == null
+                  ? Text(
+                      (user['username'] ?? 'U')[0].toUpperCase(), 
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.textMain,
+                      ),
+                    )
+                  : null,
             ),
-          ),
-          _buildFollowButton(isFollowing, theme, isDark, () {
-            Provider.of<ProfileProvider>(context, listen: false).toggleFollow(user['id']);
-            setState(() => user['is_following'] = !isFollowing);
-          }),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        user['full_name'] ?? user['username'],
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700, 
+                          fontSize: 15,
+                          color: theme.textMain,
+                        ),
+                      ),
+                      if (user['is_verified'] == true)
+                        const VerificationBadge(size: 14),
+                    ],
+                  ),
+                  Text(
+                    '@${user['username']}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12, 
+                      color: isDark ? Colors.white54 : AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildFollowButton(isFollowing, theme, isDark, () {
+              Provider.of<ProfileProvider>(context, listen: false).toggleFollow(user['id']);
+              setState(() => user['is_following'] = !isFollowing);
+            }),
+          ],
+        ),
       ),
     );
   }

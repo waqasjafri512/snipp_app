@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/notification_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/dare_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/repositories/api_service.dart';
+import 'dart:convert';
 import 'profile_screen.dart';
+import 'dare_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -153,13 +157,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     int idx = notif['actor_id'] % 5;
     
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         if (isUnread) {
           Provider.of<NotificationProvider>(context, listen: false).markAsRead(notif['id']);
         }
-        Navigator.push(context, MaterialPageRoute(
-          builder: (context) => ProfileScreen(userId: notif['actor_id']),
-        ));
+        
+        final type = notif['type'];
+        final dareId = notif['dare_id'];
+        
+        // For dare-related notifications, navigate to the dare
+        if (dareId != null && (type == 'like' || type == 'comment' || type == 'accept' || type == 'complete')) {
+          try {
+            final apiService = ApiService();
+            final response = await apiService.get('/dares/$dareId');
+            final data = jsonDecode(response.body);
+            if (data['success'] && data['data'] != null && context.mounted) {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => DareDetailScreen(dare: data['data']['dare']),
+              ));
+            }
+          } catch (e) {
+            // Fallback to profile if dare fetch fails
+            if (context.mounted) {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => ProfileScreen(userId: notif['actor_id']),
+              ));
+            }
+          }
+        } else {
+          // For follow notifications, navigate to actor's profile
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => ProfileScreen(userId: notif['actor_id']),
+          ));
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -178,7 +208,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         child: Row(
           children: [
-            _buildAvatar(idx, size: 48),
+            _buildAvatar(notif, size: 48),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -227,7 +257,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildAvatar(int idx, {double size = 40}) {
+  Widget _buildAvatar(Map<String, dynamic> notif, {double size = 40}) {
+    final avatarUrl = notif['actor_avatar'];
+    final username = notif['actor_username'] ?? 'U';
+    final int idx = (notif['actor_id'] ?? 0) % 5;
+    
+    if (avatarUrl != null && avatarUrl.toString().isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          image: DecorationImage(
+            image: NetworkImage(AppConstants.getMediaUrl(avatarUrl)),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+    
     return Container(
       width: size,
       height: size,
@@ -237,7 +285,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       alignment: Alignment.center,
       child: Text(
-        'U',
+        username[0].toUpperCase(),
         style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w800,

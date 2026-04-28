@@ -1,9 +1,56 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
+import '../../data/services/socket_service.dart';
 
 class ProfileProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  StreamSubscription? _socketSub;
+
+  ProfileProvider() {
+    _initSocketListeners();
+  }
+
+  void _initSocketListeners() {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
+      if (event['event'] == 'newDare') {
+        final newDare = event['data'];
+        final creatorId = newDare['creator_id']?.toString();
+        final currentProfileId = _userProfile?['id']?.toString();
+        
+        if (currentProfileId != null && creatorId == currentProfileId) {
+          final exists = _userDares.any((d) => d['id'].toString() == newDare['id'].toString());
+          if (!exists) {
+            _userDares.insert(0, newDare);
+            // Increment posted count if it exists in profile
+            if (_userProfile != null && _userProfile!['dares_posted'] != null) {
+              _userProfile!['dares_posted'] = (_userProfile!['dares_posted'] ?? 0) + 1;
+            }
+            notifyListeners();
+          }
+        }
+      } else if (event['event'] == 'dareDeleted') {
+        final dareId = event['data'];
+        _userDares.removeWhere((d) => d['id'] == dareId);
+        _participatedDares.removeWhere((d) => d['id'] == dareId);
+        notifyListeners();
+      } else if (event['event'] == 'dareUpdated') {
+        final updatedDare = event['data'];
+        final index = _userDares.indexWhere((d) => d['id'] == updatedDare['id']);
+        if (index != -1) {
+          _userDares[index] = updatedDare;
+          notifyListeners();
+        }
+        final pIndex = _participatedDares.indexWhere((d) => d['id'] == updatedDare['id']);
+        if (pIndex != -1) {
+          _participatedDares[pIndex] = updatedDare;
+          notifyListeners();
+        }
+      }
+    });
+  }
   
   bool _isLoading = false;
   Map<String, dynamic>? _userProfile;
@@ -44,6 +91,18 @@ class ProfileProvider with ChangeNotifier {
       _error = 'Connection error';
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Add dare locally (used after creation)
+  void addDareLocally(Map<String, dynamic> dare) {
+    final exists = _userDares.any((d) => d['id'].toString() == dare['id'].toString());
+    if (!exists) {
+      _userDares.insert(0, dare);
+      if (_userProfile != null) {
+        _userProfile!['dares_posted'] = (_userProfile!['dares_posted'] ?? 0) + 1;
+      }
+      notifyListeners();
     }
   }
 
@@ -243,5 +302,40 @@ class ProfileProvider with ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+  // Update specific settings toggles
+  Future<bool> updateProfileSettings(String key, dynamic value) async {
+    if (_userProfile == null) return false;
+    
+    // Optimistic update
+    final oldValue = _userProfile![key];
+    _userProfile![key] = value;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.put('/profile/update', {key: value});
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success']) {
+        _userProfile = data['data']['profile'];
+        notifyListeners();
+        return true;
+      } else {
+        // Rollback
+        _userProfile![key] = oldValue;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _userProfile![key] = oldValue;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 }

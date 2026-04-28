@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
@@ -6,13 +7,16 @@ import '../../core/constants/app_constants.dart';
 
 class ChatProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  StreamSubscription? _socketSub;
+  int? _currentUserId;
   
   ChatProvider() {
     _initSocketListeners();
   }
 
   void _initSocketListeners() {
-    SocketService().eventStream.listen((event) {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'message') {
         final message = event['data'] as Map<String, dynamic>;
         
@@ -65,12 +69,31 @@ class ChatProvider with ChangeNotifier {
 
   // Unified SocketService handles initialization
   void initSocket(int currentUserId) {
+    _currentUserId = currentUserId;
     SocketService().connect(currentUserId);
   }
 
   void _updateConversationsLocally(Map<String, dynamic> message) {
-    // Logic to update the conversations list in memory for instant feedback
-    fetchConversations(); // Simpler for now, can be optimized
+    final senderId = message['sender_id'];
+    final receiverId = message['receiver_id'];
+    final otherId = senderId == _currentUserId ? receiverId : senderId;
+    
+    final idx = _conversations.indexWhere((c) => c['other_user_id'] == otherId);
+    if (idx != -1) {
+      // Update existing conversation in-memory
+      _conversations[idx]['last_message'] = message['content'];
+      _conversations[idx]['last_message_at'] = message['created_at'];
+      if (senderId != _currentUserId && _activeChatUserId != otherId) {
+        _conversations[idx]['unread_count'] = (_conversations[idx]['unread_count'] ?? 0) + 1;
+      }
+      // Move to top of list
+      final conv = _conversations.removeAt(idx);
+      _conversations.insert(0, conv);
+      notifyListeners();
+    } else {
+      // Truly new conversation — fetch from server
+      fetchConversations();
+    }
   }
 
   // Fetch all conversations
@@ -171,7 +194,7 @@ class ChatProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    // SocketService is managed elsewhere (AuthProvider)
+    _socketSub?.cancel();
     super.dispose();
   }
 }

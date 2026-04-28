@@ -14,6 +14,7 @@ import 'edit_profile_screen.dart';
 import 'chat_detail_screen.dart';
 import 'user_list_screen.dart';
 import 'settings_screen.dart';
+import '../widgets/verification_badge.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int? userId;
@@ -126,6 +127,73 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
 
+  void _showImageOptions(bool isAvatar, String? imageUrl) {
+    final theme = Provider.of<ThemeProvider>(context, listen: false).currentTheme;
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).currentThemeIndex == 1;
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final bool isOwnProfile = widget.userId == null || widget.userId == authProv.user?['id'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: theme.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            Text(
+              isAvatar ? 'Profile Picture' : 'Cover Photo',
+              style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800, color: theme.textMain),
+            ),
+            const SizedBox(height: 20),
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              ListTile(
+                leading: Icon(Icons.fullscreen_rounded, color: theme.textMain),
+                title: Text('View Full Image', style: GoogleFonts.plusJakartaSans(color: theme.textMain)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _viewFullImage(imageUrl);
+                },
+              ),
+            if (isOwnProfile)
+              ListTile(
+                leading: Icon(Icons.camera_alt_outlined, color: theme.textMain),
+                title: Text(imageUrl != null && imageUrl.isNotEmpty ? 'Upload New Photo' : 'Upload Photo', style: GoogleFonts.plusJakartaSans(color: theme.textMain)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(isAvatar);
+                },
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewFullImage(String url) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(backgroundColor: Colors.black, elevation: 0, iconTheme: const IconThemeData(color: Colors.white)),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.network(AppConstants.getMediaUrl(url), fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickImage(bool isAvatar) async {
     final picker = ImagePicker();
     
@@ -195,51 +263,59 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         final currentTheme = themeProv.currentTheme;
         final isDark = themeProv.currentThemeIndex == 1;
 
-        return Scaffold(
-          backgroundColor: currentTheme.background,
-          appBar: AppBar(
-            backgroundColor: currentTheme.background,
-            elevation: 0,
-            leading: Navigator.canPop(context)
-                ? IconButton(
-                    icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
-                    onPressed: () => Navigator.pop(context),
-                  )
-                : null,
-            title: Consumer<ProfileProvider>(
-              builder: (context, profileProv, _) => Text(
-                profileProv.userProfile?['username'] ?? 'Profile',
-                style: GoogleFonts.plusJakartaSans(
-                  color: currentTheme.textMain, 
-                  fontWeight: FontWeight.w700, 
-                  fontSize: 16
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: Icon(Icons.search_rounded, color: currentTheme.textMain),
-                onPressed: () {},
-              ),
-              if (isOwnProfile)
-                IconButton(
-                  icon: Icon(Icons.menu_rounded, color: currentTheme.textMain),
-                  onPressed: () => _showSettings(context),
-                ),
-            ],
-          ),
-          body: Consumer<ProfileProvider>(
-            builder: (context, profileProv, child) {
-              if (profileProv.isLoading) {
-                return Center(child: CircularProgressIndicator(color: currentTheme.primaryStart));
-              }
+        return Consumer<ProfileProvider>(
+          builder: (context, profileProv, child) {
+            if (profileProv.isLoading) {
+              return Container(
+                color: currentTheme.background,
+                child: Center(child: CircularProgressIndicator(color: currentTheme.primaryStart)),
+              );
+            }
 
-              final profile = profileProv.userProfile;
-              if (profile == null) return Center(child: Text('Profile not found', style: TextStyle(color: currentTheme.textMain)));
+            final profile = profileProv.userProfile;
+            if (profile == null) {
+              return Container(
+                color: currentTheme.background,
+                child: Center(child: Text('Profile not found', style: TextStyle(color: currentTheme.textMain))),
+              );
+            }
 
-              return NestedScrollView(
+            return Container(
+              color: currentTheme.background,
+              child: NestedScrollView(
                 headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
                   return <Widget>[
+                  // 1. SliverAppBar (Replaces fixed AppBar)
+                  SliverAppBar(
+                    backgroundColor: currentTheme.background,
+                    elevation: 0,
+                    pinned: true,
+                    leading: Navigator.canPop(context)
+                        ? IconButton(
+                            icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
+                            onPressed: () => Navigator.pop(context),
+                          )
+                        : null,
+                    title: Text(
+                      profile['username'] ?? 'Profile',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: currentTheme.textMain, 
+                        fontWeight: FontWeight.w700, 
+                        fontSize: 16
+                      ),
+                    ),
+                    actions: [
+                      IconButton(
+                        icon: Icon(Icons.search_rounded, color: currentTheme.textMain),
+                        onPressed: () {},
+                      ),
+                      if (isOwnProfile)
+                        IconButton(
+                          icon: Icon(Icons.menu_rounded, color: currentTheme.textMain),
+                          onPressed: () => _showSettings(context),
+                        ),
+                    ],
+                  ),
                   // 1. Cover and Profile Picture Section
                   SliverToBoxAdapter(
                     child: Column(
@@ -254,29 +330,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 left: 0,
                                 right: 0,
                                 height: 200,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: isDark ? Colors.white10 : Colors.grey[200],
-                                    image: profile['cover_url'] != null
-                                        ? DecorationImage(
-                                            image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
-                                            fit: BoxFit.cover,
+                                child: GestureDetector(
+                                  onTap: () => _showImageOptions(false, profile['cover_url']),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: isDark ? Colors.white10 : Colors.grey[200],
+                                      image: profile['cover_url'] != null
+                                          ? DecorationImage(
+                                              image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                    ),
+                                    child: profile['cover_url'] == null
+                                        ? Container(
+                                            decoration: BoxDecoration(
+                                              gradient: isDark 
+                                                ? LinearGradient(colors: [Colors.black, currentTheme.primaryStart.withOpacity(0.3)])
+                                                : const LinearGradient(
+                                                    colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                            ),
                                           )
                                         : null,
                                   ),
-                                  child: profile['cover_url'] == null
-                                      ? Container(
-                                          decoration: BoxDecoration(
-                                            gradient: isDark 
-                                              ? LinearGradient(colors: [Colors.black, currentTheme.primaryStart.withOpacity(0.3)])
-                                              : const LinearGradient(
-                                                  colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                ),
-                                          ),
-                                        )
-                                      : null,
                                 ),
                               ),
                               // Profile Picture overlapping cover
@@ -285,7 +364,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 left: 16,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
-                                  onTap: isOwnProfile ? () => _pickImage(true) : null,
+                                  onTap: () => _showImageOptions(true, profile['avatar_url']),
                                   child: Stack(
                                     children: [
                                       Container(
@@ -315,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 Positioned(
                                   top: 150,
                                   right: 16,
-                                  child: _buildCircleIconButton(Icons.camera_alt_rounded, currentTheme, isDark, () => _pickImage(false)),
+                                  child: _buildCircleIconButton(Icons.camera_alt_rounded, currentTheme, isDark, () => _showImageOptions(false, profile['cover_url'])),
                                 ),
                             ],
                           ),
@@ -338,10 +417,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                       color: currentTheme.textMain,
                                     ),
                                   ),
-                                  if (profile['is_verified'] == true) ...[
-                                    const SizedBox(width: 6),
-                                    const Icon(Icons.verified, color: Colors.blue, size: 20),
-                                  ],
+                                  if (profile['is_verified'] == true)
+                                    const VerificationBadge(size: 20, padding: EdgeInsets.only(left: 8)),
                                 ],
                               ),
                               if (profile['username'] != null)
@@ -440,7 +517,94 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 _buildDetailItem(Icons.home_rounded, 'Lives in ${profile['location']}', currentTheme, isDark),
                               if (profile['from_location'] != null && profile['from_location'].isNotEmpty)
                                 _buildDetailItem(Icons.location_on_rounded, 'From ${profile['from_location']}', currentTheme, isDark),
-                              _buildDetailItem(Icons.rss_feed_rounded, 'Followed by ${profile['followers_count'] ?? 0} people', currentTheme, isDark, isBold: true),
+                              
+                              // Stats Row (Followers / Following)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => Navigator.push(
+                                        context, 
+                                        MaterialPageRoute(
+                                          builder: (context) => UserListScreen(
+                                            userId: profile['id'], 
+                                            title: 'Followers',
+                                            isFollowers: true,
+                                          )
+                                        )
+                                      ),
+                                      child: RichText(
+                                        text: TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: '${profile['followers_count'] ?? 0} ',
+                                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: currentTheme.textMain, fontSize: 15),
+                                            ),
+                                            TextSpan(
+                                              text: 'Followers',
+                                              style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white54 : Colors.grey[600], fontSize: 15),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 20),
+                                    GestureDetector(
+                                      onTap: () => Navigator.push(
+                                        context, 
+                                        MaterialPageRoute(
+                                          builder: (context) => UserListScreen(
+                                            userId: profile['id'], 
+                                            title: 'Following',
+                                            isFollowers: false,
+                                          )
+                                        )
+                                      ),
+                                      child: RichText(
+                                        text: TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: '${profile['following_count'] ?? 0} ',
+                                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: currentTheme.textMain, fontSize: 15),
+                                            ),
+                                            TextSpan(
+                                              text: 'Following',
+                                              style: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white54 : Colors.grey[600], fontSize: 15),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (profile['is_friend'] == true) ...[
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: currentTheme.primaryStart.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: currentTheme.primaryStart.withOpacity(0.2)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.handshake_rounded, size: 14, color: currentTheme.primaryStart),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Friend',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: currentTheme.primaryStart,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 16),
                               _buildFBButton(
                                 'Edit Public Details', 
@@ -486,9 +650,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     _buildPhotosGrid(profileProv.userDares, currentTheme, isDark),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );

@@ -12,6 +12,7 @@ import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/live_provider.dart';
 import 'presentation/providers/story_provider.dart';
 import 'presentation/providers/group_provider.dart';
+import 'presentation/providers/call_provider.dart';
 import 'presentation/screens/splash_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/signup_screen.dart';
@@ -65,6 +66,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => StoryProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => CallProvider()),
       ],
       child: const MyApp(),
     ),
@@ -73,6 +75,7 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   static final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   
   const MyApp({super.key});
 
@@ -84,6 +87,7 @@ class MyApp extends StatelessWidget {
         
         return MaterialApp(
           scaffoldMessengerKey: messengerKey,
+          navigatorKey: navigatorKey,
           title: AppConstants.appName,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -131,11 +135,20 @@ class MyApp extends StatelessWidget {
               ),
               iconTheme: IconThemeData(color: currentTheme.textMain),
             ),
+            pageTransitionsTheme: const PageTransitionsTheme(
+              builders: {
+                TargetPlatform.android: ZoomPageTransitionsBuilder(),
+                TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              },
+            ),
           ),
           home: const SplashScreen(),
           routes: {
             AppConstants.homeRoute: (context) => const HomeScreen(),
-            AppConstants.profileRoute: (context) => const ProfileScreen(),
+            AppConstants.profileRoute: (context) {
+              final userId = ModalRoute.of(context)!.settings.arguments as int?;
+              return ProfileScreen(userId: userId);
+            },
             AppConstants.createDareRoute: (context) => const CreateDareScreen(),
             AppConstants.chatListRoute: (context) => const ChatListScreen(),
             AppConstants.searchRoute: (context) => const SearchScreen(),

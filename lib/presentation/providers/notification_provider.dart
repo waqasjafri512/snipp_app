@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../main.dart';
@@ -6,22 +7,23 @@ import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
 
 class NotificationProvider with ChangeNotifier {
-  static final NotificationProvider _instance = NotificationProvider._internal();
-  factory NotificationProvider() => _instance;
-  NotificationProvider._internal() {
+  StreamSubscription? _socketSub;
+  
+  // Static userId so AuthProvider can set it without Provider context
+  static int? _currentUserId;
+  static void setUserId(int? userId) {
+    _currentUserId = userId;
+  }
+
+  NotificationProvider() {
     _initSocketListeners();
   }
 
   final ApiService _apiService = ApiService();
-  
-  int? _currentUserId;
-
-  void setUserId(int? userId) {
-    _currentUserId = userId;
-  }
 
   void _initSocketListeners() {
-    SocketService().eventStream.listen((event) {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'newNotification') {
         final data = event['data'];
         if (data != null) {
@@ -45,20 +47,40 @@ class NotificationProvider with ChangeNotifier {
           _calculateUnread();
           notifyListeners();
 
-          // Show top-level snackbar
+          // Show top-level snackbar with proper message
           final messenger = MyApp.messengerKey.currentState;
           if (messenger != null) {
+            final type = data['type']?.toString() ?? '';
+            final actor = data['actor_username'] ?? 'Someone';
+            final dareTitle = data['dare_title'] ?? '';
+            String message;
+            switch (type) {
+              case 'like':
+                message = '❤️ $actor liked your dare "$dareTitle"';
+                break;
+              case 'comment':
+                message = '💬 $actor commented on "$dareTitle"';
+                break;
+              case 'follow':
+                message = '👋 $actor started following you';
+                break;
+              case 'accept':
+                message = '🎯 $actor accepted your dare "$dareTitle"';
+                break;
+              case 'complete':
+                message = '🏆 $actor completed your dare "$dareTitle"';
+                break;
+              default:
+                message = '🔔 $actor interacted with your content';
+            }
             messenger.showSnackBar(
               SnackBar(
-                content: Text('🔔 ${data['actor_username']} ${data['type']}ed your dare: ${data['dare_title']}'),
+                content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
                 behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Push it to top? No, snackbars are bottom.
                 backgroundColor: AppColors.primaryStart,
-                action: SnackBarAction(
-                  label: 'VIEW',
-                  textColor: Colors.white,
-                  onPressed: () {}, // Navigate to notifications?
-                ),
+                duration: const Duration(seconds: 3),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               ),
             );
           }
@@ -148,5 +170,11 @@ class NotificationProvider with ChangeNotifier {
     } catch (e) {
       print('Save FCM token error: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 }

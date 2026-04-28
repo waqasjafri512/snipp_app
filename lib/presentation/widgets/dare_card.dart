@@ -9,6 +9,8 @@ import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'comment_bottom_sheet.dart';
 import '../screens/chat_detail_screen.dart';
+import 'verification_badge.dart';
+import '../screens/create_dare_screen.dart';
 
 class DareCard extends StatelessWidget {
   final Map<String, dynamic> dare;
@@ -17,12 +19,18 @@ class DareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isCompletion = dare['post_type'] == 'completion';
-    final bool isGeneral = dare['actual_post_type'] == 'general';
+    final bool isGeneral = dare['post_type'] == 'general' || dare['actual_post_type'] == 'general';
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final bool isOwner = dare['creator_id'] == authProv.user?['id'];
+
     final String displayName = isCompletion 
         ? (dare['solver_full_name'] ?? dare['solver_username'] ?? 'User') 
         : (dare['creator_full_name'] ?? dare['creator_name'] ?? dare['creator_username'] ?? 'User');
 
     final bool hasMedia = dare['media_url'] != null;
+    final int targetUserId = isCompletion 
+        ? (dare['user_id'] ?? dare['creator_id']) 
+        : dare['creator_id'];
 
     return Consumer<ThemeProvider>(
       builder: (context, themeProv, _) {
@@ -43,13 +51,13 @@ class DareCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: dare['creator_id']),
+                      onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: targetUserId),
                       child: _buildAvatar(dare),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: dare['creator_id']),
+                        onTap: () => Navigator.pushNamed(context, AppConstants.profileRoute, arguments: targetUserId),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -65,15 +73,16 @@ class DareCard extends StatelessWidget {
                                       color: theme.textMain,
                                     ),
                                   ),
-                                  if (dare['creator_verified'] == true) ...[
+                                  if (dare['creator_verified'] == true)
                                     const WidgetSpan(
                                       alignment: PlaceholderAlignment.middle,
-                                      child: Padding(
-                                        padding: EdgeInsets.only(left: 4),
-                                        child: Icon(Icons.verified, color: Colors.blue, size: 14),
-                                      ),
+                                      child: VerificationBadge(size: 14),
                                     ),
-                                  ],
+                                  if (isCompletion && dare['solver_verified'] == true)
+                                    const WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: VerificationBadge(size: 14, padding: EdgeInsets.only(left: 4, right: 4)),
+                                    ),
                                   if (isCompletion)
                                     TextSpan(
                                       text: ' completed a dare.',
@@ -120,7 +129,16 @@ class DareCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
                       onSelected: (value) {
-                        if (value == 'message') {
+                        if (value == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CreateDareScreen(existingDare: dare),
+                            ),
+                          );
+                        } else if (value == 'delete') {
+                          _showDeleteConfirmation(context);
+                        } else if (value == 'message') {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -132,7 +150,7 @@ class DareCard extends StatelessWidget {
                             ),
                           );
                         } else if (value == 'profile') {
-                          Navigator.pushNamed(context, AppConstants.profileRoute, arguments: dare['creator_id']);
+                          Navigator.pushNamed(context, AppConstants.profileRoute, arguments: targetUserId);
                         } else if (value == 'hide' || value == 'report') {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(value == 'hide' ? 'Post hidden' : 'Post reported')),
@@ -180,6 +198,28 @@ class DareCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (isOwner) ...[
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 18, color: theme.textMain),
+                                const SizedBox(width: 10),
+                                Text('Edit Post', style: TextStyle(color: theme.textMain)),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                                const SizedBox(width: 10),
+                                const Text('Delete Post', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -195,16 +235,18 @@ class DareCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        dare['title'] ?? '',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: theme.textMain,
+                      if (!isGeneral && dare['title'] != null && dare['title'].toString().isNotEmpty)
+                        Text(
+                          dare['title'],
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: theme.textMain,
+                          ),
                         ),
-                      ),
                       if (dare['description'] != null && dare['description'].isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        if (!isGeneral && dare['title'] != null && dare['title'].toString().isNotEmpty)
+                          const SizedBox(height: 4),
                         Text(
                           dare['description'],
                           style: GoogleFonts.plusJakartaSans(
@@ -250,25 +292,25 @@ class DareCard extends StatelessWidget {
                   ),
                 )
               else if (!hasMedia && isGeneral)
-                // Facebook style text-only post
+                // Facebook style text-only post — show description as the main content
                 Container(
                   constraints: const BoxConstraints(minHeight: 250),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
                   decoration: BoxDecoration(
                     gradient: isDark 
                       ? LinearGradient(colors: [theme.primaryStart, theme.primaryEnd.withOpacity(0.5)])
-                      : LinearGradient(
-                          colors: [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)], // FB-ish Blue gradient
+                      : const LinearGradient(
+                          colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    dare['title'] ?? '',
+                    dare['description'] ?? dare['title'] ?? '',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 26,
+                      fontSize: (dare['description'] ?? dare['title'] ?? '').length > 100 ? 18 : 26,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                       height: 1.3,
@@ -277,7 +319,7 @@ class DareCard extends StatelessWidget {
                 ),
 
               // "Accept Dare" CTA if it's an actionable dare
-              if (!isGeneral && !isCompletion) ...[
+              if (!isGeneral && !isCompletion && dare['post_type'] != 'general') ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: dare['is_accepted'] != true
@@ -378,7 +420,7 @@ class DareCard extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     Text(
-                      '12 shares', // Hardcoded for aesthetics, no share tracking yet
+                      '${dare['shares_count'] ?? 0} shares',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         color: isDark ? Colors.white70 : Colors.grey[600],
@@ -462,31 +504,33 @@ class DareCard extends StatelessWidget {
   }
 
   Widget _buildAvatar(Map<String, dynamic> dare) {
-    final String initial = (dare['creator_full_name'] ?? dare['creator_username'] ?? 'U')[0].toUpperCase();
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        shape: BoxShape.circle,
-        image: (dare['creator_avatar'] != null && dare['creator_avatar'].isNotEmpty)
-            ? DecorationImage(
-                image: NetworkImage(AppConstants.getMediaUrl(dare['creator_avatar'])),
-                fit: BoxFit.cover,
+    return Hero(
+      tag: 'avatar_${dare['creator_id']}_${dare['id']}',
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          shape: BoxShape.circle,
+          image: (dare['creator_avatar'] != null && dare['creator_avatar'].isNotEmpty)
+              ? DecorationImage(
+                  image: NetworkImage(AppConstants.getMediaUrl(dare['creator_avatar'])),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: (dare['creator_avatar'] == null || dare['creator_avatar'].isEmpty)
+            ? Text(
+                (dare['creator_full_name'] ?? dare['creator_username'] ?? 'U')[0].toUpperCase(),
+                style: GoogleFonts.bricolageGrotesque(
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               )
             : null,
       ),
-      alignment: Alignment.center,
-      child: (dare['creator_avatar'] == null || dare['creator_avatar'].isEmpty)
-          ? Text(
-              initial,
-              style: GoogleFonts.bricolageGrotesque(
-                color: Colors.black54,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-              ),
-            )
-          : null,
     );
   }
 
@@ -526,6 +570,31 @@ class DareCard extends StatelessWidget {
     Provider.of<DareProvider>(context, listen: false).toggleLike(dare['id']);
   }
 
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Provider.of<DareProvider>(context, listen: false).deleteDare(dare['id']);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted')));
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showComments(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -538,8 +607,8 @@ class DareCard extends StatelessWidget {
   String _getTimeAgo(String? timeStr) {
     if (timeStr == null || timeStr.isEmpty) return '';
     try {
-      final dateTime = DateTime.parse(timeStr);
-      final diff = DateTime.now().difference(dateTime);
+      final dateTime = DateTime.parse(timeStr).toUtc();
+      final diff = DateTime.now().toUtc().difference(dateTime);
       if (diff.inDays > 7) return '${(diff.inDays / 7).floor()} w';
       if (diff.inDays > 0) return '${diff.inDays} d';
       if (diff.inHours > 0) return '${diff.inHours} h';

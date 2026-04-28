@@ -29,9 +29,7 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
-  int _selectedChip = 0;
 
-  final List<String> _categories = ["🔥 Trending", "💪 Fitness", "😂 Funny", "🎨 Creative", "🌊 Outdoors", "🍕 Food"];
 
   @override
   void initState() {
@@ -167,24 +165,23 @@ class _FeedScreenState extends State<FeedScreen> {
                                     themeProv.currentThemeIndex == 1,
                                     onTap: () => Navigator.pushNamed(context, AppConstants.searchRoute),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Consumer<NotificationProvider>(
                                     builder: (context, notifProv, _) => _buildHeaderIconButton(
                                       Icons.notifications_none_rounded,
                                       currentTheme,
                                       themeProv.currentThemeIndex == 1,
                                       hasNotification: notifProv.unreadCount > 0,
+                                      notifCount: notifProv.unreadCount,
                                       onTap: () => Navigator.pushNamed(context, AppConstants.notificationsRoute),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   _buildHeaderIconButton(
-                                    Icons.chat_bubble_outline_rounded,
+                                    Icons.live_tv_rounded,
                                     currentTheme,
                                     themeProv.currentThemeIndex == 1,
-                                    onTap: () {
-                                      Navigator.pushNamed(context, AppConstants.chatListRoute);
-                                    },
+                                    onTap: () => _startLiveStream(),
                                   ),
                                 ],
                               ),
@@ -192,55 +189,17 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                           const SizedBox(height: 14),
                           _buildStoriesList(currentTheme, themeProv.currentThemeIndex == 1),
+                          const SizedBox(height: 10),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: currentTheme.textMain.withOpacity(0.05),
+                          ),
                         ],
                       ),
                     ),
                   ),
 
-                  // Category Chips
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 60,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        itemCount: _categories.length,
-                        itemBuilder: (context, index) {
-                          bool isSelected = _selectedChip == index;
-                          final isDark = themeProv.currentThemeIndex == 1;
-                          
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedChip = index),
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                gradient: isSelected ? currentTheme.gradient : null,
-                                color: isSelected ? null : (isDark ? Colors.white10 : const Color(0xFFEDE9FE)),
-                                borderRadius: BorderRadius.circular(100),
-                                boxShadow: isSelected ? [
-                                  BoxShadow(
-                                    color: currentTheme.primaryStart.withOpacity(0.3),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ] : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                _categories[index],
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected ? Colors.white : currentTheme.primaryStart,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
 
                   // Feed
                   Consumer<DareProvider>(
@@ -304,7 +263,7 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildHeaderIconButton(IconData icon, AppTheme theme, bool isDark, {bool hasNotification = false, VoidCallback? onTap}) {
+  Widget _buildHeaderIconButton(IconData icon, AppTheme theme, bool isDark, {bool hasNotification = false, int notifCount = 0, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -320,13 +279,13 @@ class _FeedScreenState extends State<FeedScreen> {
             Icon(icon, size: 18, color: theme.textMain),
             if (hasNotification)
               Positioned(
-                top: 7,
-                right: 7,
+                top: 10,
+                right: 10,
                 child: Container(
-                  width: 8,
-                  height: 8,
+                  width: 10,
+                  height: 10,
                   decoration: BoxDecoration(
-                    color: theme.primaryEnd,
+                    color: const Color(0xFFEF4444), // Solid red for dot
                     shape: BoxShape.circle,
                     border: Border.all(color: theme.background, width: 2),
                   ),
@@ -338,12 +297,12 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildStoriesList(AppTheme theme, bool isDark) {
-    return Consumer3<LiveProvider, StoryProvider, AuthProvider>(
-      builder: (context, liveProv, storyProv, authProv, _) {
+  Widget _buildStoriesList(dynamic theme, bool isDark) {
+    return Consumer3<StoryProvider, AuthProvider, LiveProvider>(
+      builder: (context, storyProv, authProv, liveProv, _) {
         final List<Map<String, dynamic>> items = [
           {
-            'username': 'Your Story', 
+            'username': 'Add Story', 
             'isMe': true, 
             'avatar_url': authProv.user?['avatar_url']
           },
@@ -352,10 +311,10 @@ class _FeedScreenState extends State<FeedScreen> {
         ];
 
         return Container(
-          height: 100,
+          height: 160,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            physics: const BouncingScrollPhysics(),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
@@ -363,8 +322,9 @@ class _FeedScreenState extends State<FeedScreen> {
               final bool isStory = item['isStory'] == true;
               final bool isMe = item['isMe'] == true;
 
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
+              return Container(
+                width: 100,
+                margin: const EdgeInsets.only(right: 12),
                 child: GestureDetector(
                   onTap: () {
                     if (isMe) {
@@ -389,81 +349,99 @@ class _FeedScreenState extends State<FeedScreen> {
                       );
                     }
                   },
-                  child: Column(
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(2.5),
-                            decoration: BoxDecoration(
-                              gradient: (isLive || isStory) ? theme.gradient : null,
-                              color: (isLive || isStory) ? null : (isDark ? Colors.white12 : Colors.grey.withOpacity(0.15)),
+                      // Card Background
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: item['avatar_url'] != null 
+                          ? Image.network(
+                              AppConstants.getMediaUrl(item['avatar_url']),
+                              fit: BoxFit.cover,
+                            )
+                          : Container(color: isDark ? Colors.white10 : Colors.grey[200]),
+                      ),
+                      // Overlay Gradient
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // User Avatar (Top Left)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            gradient: (isLive || isStory) ? theme.gradient : null,
+                            color: (isLive || isStory) ? null : Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.grey[300],
+                            backgroundImage: item['avatar_url'] != null 
+                              ? NetworkImage(AppConstants.getMediaUrl(item['avatar_url']))
+                              : null,
+                            child: item['avatar_url'] == null 
+                              ? Text(item['username']?[0] ?? '?', style: const TextStyle(fontSize: 10))
+                              : null,
+                          ),
+                        ),
+                      ),
+                      // "Add" Icon for Me
+                      if (isMe)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
                               shape: BoxShape.circle,
                             ),
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: theme.background,
-                                shape: BoxShape.circle,
-                              ),
-                              child: _buildStoryAvatar(item, index, theme),
+                            child: Icon(Icons.add, color: theme.primaryStart, size: 24),
+                          ),
+                        ),
+                      // Live Badge
+                      if (isLive)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'LIVE',
+                              style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          if (isMe)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: theme.background,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    gradient: theme.gradient,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.add_rounded, size: 12, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          if (isLive)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.white, width: 1.5),
-                                  ),
-                                  child: const Text(
-                                    'LIVE',
-                                    style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        width: 64,
+                        ),
+                      // Name Label
+                      Positioned(
+                        bottom: 8,
+                        left: 8,
+                        right: 8,
                         child: Text(
-                          isMe ? 'Your Story' : (item['username'] ?? 'User'),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            color: theme.textMain,
-                            fontWeight: isMe || isLive || isStory ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
+                          isMe ? 'Add Story' : (item['username'] ?? 'User'),
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
@@ -475,6 +453,41 @@ class _FeedScreenState extends State<FeedScreen> {
         );
       },
     );
+  }
+
+  void _startLiveStream() async {
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final channelName = 'stream_${authProv.user?['id']}';
+    
+    final title = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String streamTitle = "${authProv.user?['username']}'s Live Stream";
+        return AlertDialog(
+          title: const Text('Go Live'),
+          content: TextField(
+            onChanged: (v) => streamTitle = v,
+            decoration: const InputDecoration(hintText: 'Stream Title'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, streamTitle), child: const Text('Go Live')),
+          ],
+        );
+      },
+    );
+
+    if (title != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BroadcasterScreen(
+            channelName: channelName,
+            title: title,
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildStoryAvatar(Map<String, dynamic> item, int index, AppTheme theme) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
@@ -5,16 +6,22 @@ import '../../data/services/socket_service.dart';
 
 class DareProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  StreamSubscription? _socketSub;
   
   DareProvider() {
     _initSocketListeners();
   }
 
   void _initSocketListeners() {
-    SocketService().eventStream.listen((event) {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'newDare') {
-        _feedDares.insert(0, event['data']);
-        notifyListeners();
+        final newDare = event['data'];
+        final exists = _feedDares.any((d) => d['id'].toString() == newDare['id'].toString());
+        if (!exists) {
+          _feedDares.insert(0, newDare);
+          notifyListeners();
+        }
       } else if (event['event'] == 'dareUpdated') {
         final updatedDare = event['data'];
         final index = _feedDares.indexWhere((d) => d['id'] == updatedDare['id']);
@@ -22,6 +29,25 @@ class DareProvider with ChangeNotifier {
           _feedDares[index] = updatedDare;
           notifyListeners();
         }
+      } else if (event['event'] == 'newComment') {
+        final data = event['data'];
+        final dareId = data['dare_id'];
+        final comment = data['comment'];
+
+        // Update comment list if we are viewing this dare's comments
+        if (_selectedDare != null && _selectedDare!['id'].toString() == dareId.toString()) {
+          final exists = _comments.any((c) => c['id'].toString() == comment['id'].toString());
+          if (!exists) {
+            _comments.add(comment);
+          }
+        }
+
+        // Update comment count in feed
+        final feedIndex = _feedDares.indexWhere((d) => d['id'].toString() == dareId.toString());
+        if (feedIndex != -1) {
+          _feedDares[feedIndex]['comments_count'] = (_feedDares[feedIndex]['comments_count'] ?? 0) + 1;
+        }
+        notifyListeners();
       } else if (event['event'] == 'dareDeleted') {
         final dareId = event['data'];
         _feedDares.removeWhere((d) => d['id'] == dareId);
@@ -88,7 +114,9 @@ class DareProvider with ChangeNotifier {
         // Inject creator info for immediate UI update
         if (userInfo != null) {
           newDare['creator_username'] = userInfo['username'];
+          newDare['creator_full_name'] = userInfo['full_name'];
           newDare['creator_avatar'] = userInfo['avatar_url'];
+          newDare['creator_verified'] = userInfo['is_verified'];
           newDare['likes_count'] = 0;
           newDare['comments_count'] = 0;
           newDare['is_liked'] = false;
@@ -161,6 +189,12 @@ class DareProvider with ChangeNotifier {
   // Fetch Comments
   Future<void> fetchComments(int dareId) async {
     _comments = [];
+    // Set selected dare for real-time updates
+    final index = _feedDares.indexWhere((d) => d['id'].toString() == dareId.toString());
+    if (index != -1) {
+      _selectedDare = _feedDares[index];
+    }
+
     try {
       final response = await _apiService.get('/dares/$dareId/comments');
       final data = jsonDecode(response.body);
@@ -315,5 +349,11 @@ class DareProvider with ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 }

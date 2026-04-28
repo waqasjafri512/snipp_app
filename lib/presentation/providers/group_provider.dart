@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
@@ -5,13 +6,15 @@ import '../../data/services/socket_service.dart';
 
 class GroupProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  StreamSubscription? _socketSub;
 
   GroupProvider() {
     _initSocketListeners();
   }
 
   void _initSocketListeners() {
-    SocketService().eventStream.listen((event) {
+    _socketSub?.cancel();
+    _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'groupMessage') {
         final message = event['data'] as Map<String, dynamic>;
         
@@ -24,8 +27,16 @@ class GroupProvider with ChangeNotifier {
           }
         }
         
-        // Update the groups list with the new message
-        fetchGroups();
+        // Update groups list in-memory instead of full re-fetch
+        final gIdx = _groups.indexWhere((g) => g['id'] == message['group_id']);
+        if (gIdx != -1) {
+          _groups[gIdx]['last_message'] = message['content'];
+          final g = _groups.removeAt(gIdx);
+          _groups.insert(0, g);
+          notifyListeners();
+        } else {
+          fetchGroups();
+        }
       }
     });
   }
@@ -121,5 +132,11 @@ class GroupProvider with ChangeNotifier {
   void clearActiveGroup() {
     _activeGroupId = null;
     _messages = [];
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 }

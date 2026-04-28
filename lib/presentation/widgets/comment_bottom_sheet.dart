@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/dare_provider.dart';
 import '../providers/theme_provider.dart';
 import '../../core/constants/app_constants.dart';
+import 'verification_badge.dart';
 
 class CommentBottomSheet extends StatefulWidget {
   final int dareId;
@@ -295,14 +296,21 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        comment['full_name'] ?? comment['username'],
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: theme.primaryStart,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              comment['full_name'] ?? comment['username'],
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: theme.primaryStart,
+                              ),
+                            ),
+                            if (comment['is_verified'] == true)
+                              const VerificationBadge(size: 12),
+                          ],
                         ),
-                      ),
                       const SizedBox(height: 2),
                       Text(
                         comment['content'],
@@ -336,7 +344,6 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                           ),
                         ),
                       ),
-                      if (!isReply) ...[
                         const SizedBox(width: 16),
                         GestureDetector(
                           onTap: () => _handleReply(comment['id'], comment['username']),
@@ -349,7 +356,6 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
