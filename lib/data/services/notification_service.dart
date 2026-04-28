@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../presentation/providers/call_provider.dart';
+import '../../main.dart';
 import '../repositories/api_service.dart';
 
 class NotificationService {
@@ -49,6 +51,15 @@ class NotificationService {
       print('Got a message whilst in the foreground!');
       print('Message data: ${message.data}');
 
+      // If it's a call, handle it via CallProvider
+      if (message.data['type'] == 'call') {
+        final context = MyApp.navigatorKey.currentContext;
+        if (context != null) {
+          Provider.of<CallProvider>(context, listen: false).handleIncomingCall(_mapFcmCallData(message.data));
+          return; // Don't show standard notification for calls in foreground
+        }
+      }
+
       if (message.notification != null) {
         print('Message also contained a notification: ${message.notification}');
         _showLocalNotification(message);
@@ -58,7 +69,30 @@ class NotificationService {
     // 4. Handle Background/Terminated Click
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('A new onMessageOpenedApp event was published!');
-      // Navigate to specific screen based on message data
+      
+      if (message.data['type'] == 'call') {
+        final context = MyApp.navigatorKey.currentContext;
+        if (context != null) {
+          Provider.of<CallProvider>(context, listen: false).handleIncomingCall(_mapFcmCallData(message.data));
+        }
+      }
+    });
+
+    // 5. Handle Terminated State Notification
+    RemoteMessage? initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null && initialMessage.data['type'] == 'call') {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        final context = MyApp.navigatorKey.currentContext;
+        if (context != null) {
+          Provider.of<CallProvider>(context, listen: false).handleIncomingCall(_mapFcmCallData(initialMessage.data));
+        }
+      });
+    }
+
+    // 6. Listen for Token Refresh
+    _fcm.onTokenRefresh.listen((newToken) {
+      print('FCM Token Refreshed: $newToken');
+      updateToken(newToken);
     });
   }
 
@@ -84,13 +118,13 @@ class NotificationService {
     );
   }
 
-  Future<void> updateToken() async {
+  Future<void> updateToken([String? token]) async {
     try {
-      String? token = await _fcm.getToken();
+      token ??= await _fcm.getToken();
       if (token != null) {
-        print('FCM Token: $token');
-        // Send token to backend
-        await _apiService.post('/auth/fcm-token', {'token': token});
+        print('Updating FCM Token on server...');
+        final response = await _apiService.post('/auth/fcm-token', {'token': token});
+        print('FCM Token update response: ${response.statusCode}');
       }
     } catch (e) {
       print('Error updating FCM token: $e');
@@ -100,5 +134,18 @@ class NotificationService {
   // Background message handler must be a top-level function
   static Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("Handling a background message: ${message.messageId}");
+  }
+
+  /// Maps FCM push notification data fields to the format CallProvider expects.
+  /// FCM sends: from, fromName, fromAvatar, callType, type='call'
+  /// CallProvider expects: from, fromName, fromAvatar, type='audio'/'video'
+  Map<String, dynamic> _mapFcmCallData(Map<String, dynamic> data) {
+    return {
+      'from': data['from'] ?? data['senderId'],
+      'fromName': data['fromName'] ?? data['senderName'] ?? 'Unknown',
+      'fromAvatar': data['fromAvatar'] ?? data['senderAvatar'],
+      'type': data['callType'] ?? 'audio',
+      'channelName': data['channelName'] ?? '',
+    };
   }
 }

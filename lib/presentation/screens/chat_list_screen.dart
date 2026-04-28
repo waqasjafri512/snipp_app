@@ -26,13 +26,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _loadConversations() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authProv = Provider.of<AuthProvider>(context, listen: false);
       if (authProv.user != null) {
         final chatProv = Provider.of<ChatProvider>(context, listen: false);
         final groupProv = Provider.of<GroupProvider>(context, listen: false);
         chatProv.initSocket(authProv.user!['id']);
-        chatProv.fetchConversations();
+        await chatProv.fetchConversations();
+        
+        // REST fallback for presence on Vercel
+        final userIds = chatProv.conversations
+            .map((c) => c['other_user_id'] as int?)
+            .whereType<int>()
+            .toList();
+        if (userIds.isNotEmpty) {
+          chatProv.fetchOnlineStatuses(userIds);
+        }
+        
         groupProv.fetchGroups();
       }
     });
@@ -139,7 +149,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                       padding: const EdgeInsets.only(right: 16),
                                       child: Column(
                                         children: [
-                                          _buildAvatarWithStatus(conv['other_user_id'] ?? index, theme, isDark, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
+                                          _buildAvatarWithStatus(
+                                            conv['other_user_id'] ?? index, 
+                                            theme, 
+                                            isDark, 
+                                            isOnline: chatProv.isUserOnline(conv['other_user_id']), 
+                                            size: 52, 
+                                            initial: displayName[0].toUpperCase()
+                                          ),
                                           const SizedBox(height: 4),
                                           SizedBox(
                                             width: 56,
@@ -212,7 +229,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 children: chatProv.conversations.asMap().entries.map((entry) {
                                   return StaggeredListAnimation(
                                     index: entry.key,
-                                    child: _buildChatItem(entry.value, theme, isDark),
+                                    child: _buildChatItem(entry.value, theme, isDark, chatProv),
                                   );
                                 }).toList(),
                               ),
@@ -315,7 +332,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatItem(Map<String, dynamic> conv, AppTheme theme, bool isDark) {
+  Widget _buildChatItem(Map<String, dynamic> conv, AppTheme theme, bool isDark, ChatProvider chatProv) {
     bool isUnread = (conv['unread_count'] ?? 0) > 0;
     int idx = conv['other_user_id'] % 5;
 
@@ -341,7 +358,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         child: Row(
           children: [
-            _buildAvatarWithStatus(idx, theme, isDark, isOnline: true, size: 52, initial: displayName[0].toUpperCase()),
+            _buildAvatarWithStatus(idx, theme, isDark, isOnline: chatProv.isUserOnline(conv['other_user_id']), size: 52, initial: displayName[0].toUpperCase()),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

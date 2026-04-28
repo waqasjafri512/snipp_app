@@ -26,14 +26,18 @@ class SocketService {
       'reconnectionAttempts': 15,
       'reconnectionDelay': 2000,
       'reconnectionDelayMax': 10000,
+      'query': {'userId': userId.toString()},
     });
 
     _socket!.connect();
 
     _socket!.onConnect((_) {
-      print('Socket connected: ${_socket!.id}');
+      print('✅ Socket connected: ${_socket!.id}');
       _socket!.emit('join', userId);
     });
+
+    _socket!.onConnectError((data) => print('❌ Socket Connect Error: $data'));
+    _socket!.onError((data) => print('❌ Socket Error: $data'));
 
     // Universal message handler
     _socket!.on('message', (data) => _emitSafe('message', data));
@@ -85,14 +89,10 @@ class SocketService {
   }
 
   void disconnect() {
+    // Don't close or replace the controller as it's used by long-lived providers
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
     _currentUserId = null;
-    // Close old controller and create fresh one for next session
-    if (!_eventController.isClosed) {
-      _eventController.close();
-    }
-    _eventController = StreamController<Map<String, dynamic>>.broadcast();
   }
 }

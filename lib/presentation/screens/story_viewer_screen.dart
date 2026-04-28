@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/story_provider.dart';
 import '../providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -94,11 +95,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
             onLongPressUp: () => _progressController.forward(),
             onLongPressCancel: () => _progressController.forward(),
             child: Center(
-              child: Image.network(
-                AppConstants.getMediaUrl(currentStory['media_url']),
+              child: CachedNetworkImage(
+                imageUrl: AppConstants.getMediaUrl(currentStory['media_url']),
                 fit: BoxFit.contain,
                 width: double.infinity,
                 height: double.infinity,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(color: Colors.white24),
+                ),
+                errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
               ),
             ),
           ),

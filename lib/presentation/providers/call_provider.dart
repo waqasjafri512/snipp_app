@@ -17,25 +17,29 @@ class CallProvider with ChangeNotifier {
     _socketSub?.cancel();
     _socketSub = SocketService().eventStream.listen((event) {
       if (event['event'] == 'incomingCall') {
-        _handleIncomingCall(event['data']);
+        handleIncomingCall(event['data']);
       }
     });
   }
 
-  void _handleIncomingCall(Map<String, dynamic> data) {
+  void handleIncomingCall(Map<String, dynamic> data) {
     if (_isCallActive) {
       // Busy, reject or ignore
       return;
     }
 
     final context = MyApp.navigatorKey.currentContext;
-    if (context == null) return;
+    if (context == null) {
+      print('CallProvider: Navigator context is null, cannot show call dialog');
+      return;
+    }
 
-    final int fromId = data['from'];
-    final String fromName = data['fromName'];
+    // Parse fromId safely as it might come as a string from FCM
+    final int fromId = data['from'] is String ? int.parse(data['from']) : data['from'];
+    final String fromName = data['fromName'] ?? 'Unknown User';
     final String? fromAvatar = data['fromAvatar'];
-    final String type = data['type'];
-    final String channelName = data['channelName'];
+    final String type = data['type'] ?? 'audio';
+    final String channelName = data['channelName'] ?? '';
 
     showGeneralDialog(
       context: context,

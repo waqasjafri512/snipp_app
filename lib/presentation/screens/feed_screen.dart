@@ -10,6 +10,7 @@ import '../providers/theme_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_constants.dart';
 import '../widgets/staggered_animation.dart';
 import '../widgets/shimmer_loading.dart';
@@ -39,11 +40,29 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _loadFeed() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       Provider.of<DareProvider>(context, listen: false).fetchFeed(page: 1);
       Provider.of<LiveProvider>(context, listen: false).fetchActiveStreams();
-      Provider.of<StoryProvider>(context, listen: false).fetchStories();
+      await Provider.of<StoryProvider>(context, listen: false).fetchStories();
+      if (mounted) _precacheStories();
     });
+  }
+
+  void _precacheStories() {
+    final stories = Provider.of<StoryProvider>(context, listen: false).stories;
+    for (var userStory in stories) {
+      final storyList = userStory['stories'] as List?;
+      if (storyList != null) {
+        for (var story in storyList) {
+          if (story['media_url'] != null) {
+            precacheImage(
+              CachedNetworkImageProvider(AppConstants.getMediaUrl(story['media_url'])),
+              context,
+            );
+          }
+        }
+      }
+    }
   }
 
   Future<void> _pickStoryMedia() async {
@@ -356,9 +375,11 @@ class _FeedScreenState extends State<FeedScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: item['avatar_url'] != null 
-                          ? Image.network(
-                              AppConstants.getMediaUrl(item['avatar_url']),
+                          ? CachedNetworkImage(
+                              imageUrl: AppConstants.getMediaUrl(item['avatar_url']),
                               fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(color: isDark ? Colors.white10 : Colors.grey[200]),
+                              errorWidget: (context, url, error) => const Icon(Icons.error),
                             )
                           : Container(color: isDark ? Colors.white10 : Colors.grey[200]),
                       ),

@@ -18,7 +18,8 @@ import '../widgets/verification_badge.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int? userId;
-  const ProfileScreen({super.key, this.userId});
+  final bool isTab;
+  const ProfileScreen({super.key, this.userId, this.isTab = false});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -290,7 +291,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     backgroundColor: currentTheme.background,
                     elevation: 0,
                     pinned: true,
-                    leading: Navigator.canPop(context)
+                    leading: (!widget.isTab && Navigator.canPop(context))
                         ? IconButton(
                             icon: Icon(Icons.arrow_back_rounded, color: currentTheme.textMain),
                             onPressed: () => Navigator.pop(context),
@@ -335,7 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: isDark ? Colors.white10 : Colors.grey[200],
-                                      image: profile['cover_url'] != null
+                                      image: profile['cover_url'] != null && profile['cover_url'].toString().isNotEmpty
                                           ? DecorationImage(
                                               image: NetworkImage(AppConstants.getMediaUrl(profile['cover_url'])),
                                               fit: BoxFit.cover,

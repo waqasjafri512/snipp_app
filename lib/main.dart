@@ -66,7 +66,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => StoryProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => CallProvider()),
+        ChangeNotifierProvider(create: (_) => CallProvider(), lazy: false),
       ],
       child: const MyApp(),
     ),

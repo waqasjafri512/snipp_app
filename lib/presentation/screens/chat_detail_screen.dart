@@ -31,7 +31,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final _scrollController = ScrollController();
   
   late StreamSubscription _socketSub;
-  bool _isOnline = false;
   DateTime? _lastSeen;
 
   @override
@@ -39,7 +38,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     super.initState();
     _loadHistory();
     _socketSub = SocketService().eventStream.listen(_onSocketEvent);
+    _checkUserStatus();
+  }
+
+  Future<void> _checkUserStatus() async {
+    // 1. Try socket check (local/non-vercel)
     SocketService().emit('checkUserStatus', widget.otherUserId);
+    
+    // 2. REST fallback
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    final response = await authProv.apiService.get('/messages/user-status/${widget.otherUserId}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body)['data'];
+      if (mounted) {
+        setState(() {
+          if (data['lastSeen'] != null) {
+            _lastSeen = DateTime.parse(data['lastSeen']).toLocal();
+          }
+          // The ChatProvider will be updated by Consumers
+        });
+      }
+    }
   }
 
   void _onSocketEvent(Map<String, dynamic> event) {
@@ -48,7 +67,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (data['userId'] == widget.otherUserId) {
         if (mounted) {
           setState(() {
-            _isOnline = data['online'] == true;
             if (data['lastSeen'] != null) {
               _lastSeen = DateTime.parse(data['lastSeen']).toLocal();
             }
@@ -132,14 +150,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
-  void _initiateCall(String type) {
+  Future<void> _initiateCall(String type) async {
     final authProv = Provider.of<AuthProvider>(context, listen: false);
     final currentUserId = authProv.user!['id'];
     
     // Generate a unique channel name for the call
     final channelName = 'call_${currentUserId}_${widget.otherUserId}_${DateTime.now().millisecondsSinceEpoch}';
     
-    // Send signal via socket
+    // 1. Try socket signal (for low latency if available)
     SocketService().emit('callUser', {
       'senderId': currentUserId,
       'receiverId': widget.otherUserId,
@@ -147,20 +165,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       'channelName': channelName,
     });
 
+    // 2. REST Fallback (Sends Push Notification via Backend)
+    try {
+      await authProv.apiService.post('/messages/call', {
+        'receiverId': widget.otherUserId,
+        'type': type,
+        'channelName': channelName,
+      });
+    } catch (e) {
+      print('REST Call initiation error: $e');
+    }
+
     // Navigate to Call Screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallScreen(
-          remoteUserId: widget.otherUserId,
-          remoteUserName: widget.otherUserName,
-          remoteUserAvatar: widget.otherUserAvatar,
-          type: type,
-          channelName: channelName,
-          isIncoming: false,
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallScreen(
+            remoteUserId: widget.otherUserId,
+            remoteUserName: widget.otherUserName,
+            remoteUserAvatar: widget.otherUserAvatar,
+            type: type,
+            channelName: channelName,
+            isIncoming: false,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -193,42 +224,47 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               icon: Icon(Icons.arrow_back_rounded, color: theme.primaryStart, size: 28),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Row(
-              children: [
-                _buildAvatar(
-                  widget.otherUserId % 5,
-                  theme,
-                  isDark,
-                  size: 40,
-                  isOnline: _isOnline,
-                  avatarUrl: widget.otherUserAvatar,
-                  initial: widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            title: Consumer<ChatProvider>(
+              builder: (context, chatProv, _) {
+                final isOnline = chatProv.isUserOnline(widget.otherUserId);
+                return Row(
                   children: [
-                    Text(
-                      widget.otherUserName,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: theme.textMain,
-                      ),
+                    _buildAvatar(
+                      widget.otherUserId % 5,
+                      theme,
+                      isDark,
+                      size: 40,
+                      isOnline: isOnline,
+                      avatarUrl: widget.otherUserAvatar,
+                      initial: widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
                     ),
-                    Text(
-                      _isOnline 
-                        ? '● Active now' 
-                        : (_lastSeen != null ? 'Last seen ${_formatLastSeen(_lastSeen!)}' : 'Offline'),
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _isOnline ? const Color(0xFF10B981) : (isDark ? Colors.white54 : Colors.grey[600]),
-                      ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.otherUserName,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: theme.textMain,
+                          ),
+                        ),
+                        Text(
+                          isOnline 
+                            ? '● Active now' 
+                            : (_lastSeen != null ? 'Last seen ${_formatLastSeen(_lastSeen!)}' : 'Offline'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isOnline ? const Color(0xFF10B981) : (isDark ? Colors.white54 : Colors.grey[600]),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
             actions: [
               GestureDetector(

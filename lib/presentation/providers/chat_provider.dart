@@ -9,9 +9,46 @@ class ChatProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   StreamSubscription? _socketSub;
   int? _currentUserId;
+  Set<int> _onlineUserIds = {};
+  Timer? _heartbeatTimer;
   
   ChatProvider() {
     _initSocketListeners();
+    _startHeartbeat();
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      if (_currentUserId != null) {
+        try {
+          await _apiService.post('/messages/heartbeat', {});
+        } catch (e) {
+          print('Heartbeat error: $e');
+        }
+      }
+    });
+  }
+
+  Future<void> fetchOnlineStatuses(List<int> userIds) async {
+    if (userIds.isEmpty) return;
+    try {
+      final response = await _apiService.post('/messages/users-status', {'userIds': userIds});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> statuses = data['data']['statuses'];
+        for (var status in statuses) {
+          if (status['online'] == true) {
+            _onlineUserIds.add(status['userId']);
+          } else {
+            _onlineUserIds.remove(status['userId']);
+          }
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Fetch online statuses error: $e');
+    }
   }
 
   void _initSocketListeners() {
@@ -47,6 +84,20 @@ class ChatProvider with ChangeNotifier {
           }
           notifyListeners();
         }
+      } else if (event['event'] == 'userStatus') {
+        final data = event['data'] as Map<String, dynamic>;
+        final userId = data['userId'];
+        final status = data['status'];
+        if (status == 'online') {
+          _onlineUserIds.add(userId);
+        } else {
+          _onlineUserIds.remove(userId);
+        }
+        notifyListeners();
+      } else if (event['event'] == 'onlineUsers') {
+        final List<dynamic> users = event['data'];
+        _onlineUserIds = users.map((id) => int.parse(id.toString())).toSet();
+        notifyListeners();
       }
     });
   }
@@ -61,6 +112,9 @@ class ChatProvider with ChangeNotifier {
   List<dynamic> get conversations => _conversations;
   List<dynamic> get messages => _messages;
   String? get error => _error;
+  Set<int> get onlineUserIds => _onlineUserIds;
+
+  bool isUserOnline(int userId) => _onlineUserIds.contains(userId);
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -195,6 +249,7 @@ class ChatProvider with ChangeNotifier {
   @override
   void dispose() {
     _socketSub?.cancel();
+    _heartbeatTimer?.cancel();
     super.dispose();
   }
 }

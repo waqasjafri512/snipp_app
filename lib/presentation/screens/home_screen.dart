@@ -14,6 +14,7 @@ import 'search_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import 'dart:async';
+import '../../data/services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Sync FCM Token on login/app start
+    NotificationService().updateToken();
   }
 
   final List<Widget> _screens = [
@@ -36,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const SearchScreen(),
     const SizedBox.shrink(), // Placeholder for center button
     const ChatListScreen(),
-    const ProfileScreen(),
+    const ProfileScreen(isTab: true),
   ];
 
   void _onItemTapped(int index) {
