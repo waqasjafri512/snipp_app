@@ -13,6 +13,7 @@ import 'comment_bottom_sheet.dart';
 import '../screens/chat_detail_screen.dart';
 import 'verification_badge.dart';
 import '../screens/create_dare_screen.dart';
+import 'video_feed_player.dart';
 
 class DareCard extends StatelessWidget {
   final Map<String, dynamic> dare;
@@ -39,10 +40,11 @@ class DareCard extends StatelessWidget {
         final theme = themeProv.currentTheme;
         final isDark = themeProv.currentThemeIndex == 1;
 
-        return Container(
-          color: theme.background,
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.only(top: 12, bottom: 4),
+        return RepaintBoundary(
+          child: Container(
+            color: theme.background,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -268,21 +270,26 @@ class DareCard extends StatelessWidget {
               if (hasMedia)
                 _DoubleTapLikeWrapper(
                   onDoubleTap: () => _handleLike(context),
-                  child: CachedNetworkImage(
-                    imageUrl: AppConstants.getMediaUrl(dare['media_url']),
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    placeholder: (context, url) => Container(
-                      height: 250,
-                      color: isDark ? Colors.white10 : Colors.grey[200],
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryStart)),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 200,
-                      color: isDark ? Colors.white10 : Colors.grey[200],
-                      child: const Center(child: Icon(Icons.error_outline)),
-                    ),
-                  ),
+                  child: dare['media_type'] == 'video'
+                      ? VideoFeedPlayer(
+                          videoUrl: AppConstants.getMediaUrl(dare['media_url']),
+                          autoPlay: true,
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: AppConstants.getMediaUrl(dare['media_url']),
+                          fit: BoxFit.contain,
+                          width: double.infinity,
+                          placeholder: (context, url) => Container(
+                            height: 250,
+                            color: isDark ? Colors.white10 : Colors.grey[200],
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryStart)),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            height: 200,
+                            color: isDark ? Colors.white10 : Colors.grey[200],
+                            child: const Center(child: Icon(Icons.error_outline)),
+                          ),
+                        ),
                 )
               else if (!hasMedia && !isGeneral)
                 // Dare without media (using emoji/gradient)
@@ -484,7 +491,7 @@ class DareCard extends StatelessWidget {
               Container(height: 6, color: isDark ? Colors.black : const Color(0xFFC9CCD1)),
             ],
           ),
-        );
+        ));
       },
     );
   }

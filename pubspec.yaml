@@ -27,6 +27,10 @@ dependencies:
   firebase_auth: any
   firebase_messaging: ^15.0.0
   flutter_local_notifications: ^17.0.0
+  hive_flutter: ^1.1.0
+  share_plus: ^7.2.1
+  video_player: ^2.8.2
+  flutter_cache_manager: ^3.3.1
 #  image_cropper: ^5.0.1
 
 dev_dependencies:

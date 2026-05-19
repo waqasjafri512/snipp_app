@@ -32,9 +32,13 @@ import 'presentation/screens/onboarding_screen.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'data/services/notification_service.dart';
+import 'data/services/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Cache Service
+  await CacheService().init();
   
   try {
     await Firebase.initializeApp();

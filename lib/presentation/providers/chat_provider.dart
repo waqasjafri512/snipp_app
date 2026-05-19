@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/services/cache_service.dart';
 
 class ChatProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -143,6 +144,7 @@ class ChatProvider with ChangeNotifier {
       // Move to top of list
       final conv = _conversations.removeAt(idx);
       _conversations.insert(0, conv);
+      CacheService().cacheConversations(_conversations);
       notifyListeners();
     } else {
       // Truly new conversation — fetch from server
@@ -152,11 +154,19 @@ class ChatProvider with ChangeNotifier {
 
   // Fetch all conversations
   Future<void> fetchConversations() async {
+    // Fill from local Hive cache instantly
+    final cached = CacheService().getCachedConversations();
+    if (cached.isNotEmpty && _conversations.isEmpty) {
+      _conversations = List<dynamic>.from(cached);
+      notifyListeners();
+    }
+    
     try {
       final response = await _apiService.get('/messages/conversations');
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['success']) {
         _conversations = data['data']['conversations'];
+        CacheService().cacheConversations(_conversations);
         notifyListeners();
       }
     } catch (e) {
