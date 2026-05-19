@@ -223,7 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     if (source == null) return;
 
-    final file = await picker.pickImage(source: source, imageQuality: 80);
+    final file = await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1080);
     if (file == null) return;
 
     try {

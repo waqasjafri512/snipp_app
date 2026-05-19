@@ -28,6 +28,7 @@ import 'presentation/screens/broadcaster_screen.dart';
 import 'presentation/screens/viewer_screen.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/theme_center_screen.dart';
+import 'presentation/screens/onboarding_screen.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'data/services/notification_service.dart';
@@ -153,6 +154,7 @@ class MyApp extends StatelessWidget {
             AppConstants.chatListRoute: (context) => const ChatListScreen(),
             AppConstants.searchRoute: (context) => const SearchScreen(),
             AppConstants.notificationsRoute: (context) => const NotificationsScreen(),
+            AppConstants.onboardingRoute: (context) => const OnboardingScreen(),
             '/theme-center': (context) => const ThemeCenterScreen(),
             '/broadcaster': (context) {
               final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;

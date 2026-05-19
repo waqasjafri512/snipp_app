@@ -53,7 +53,7 @@ class _SignupScreenState extends State<SignupScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, AppConstants.homeRoute);
+      Navigator.pushReplacementNamed(context, AppConstants.onboardingRoute);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProv.error ?? 'Registration failed')),

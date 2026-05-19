@@ -372,6 +372,7 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
                 const Spacer(),
                 _buildActionIcon(Icons.photo_library, Colors.green, () => _pickMedia(ImageSource.gallery)),
                 _buildActionIcon(Icons.camera_alt, Colors.redAccent, () => _pickMedia(ImageSource.camera)),
+                _buildActionIcon(Icons.videocam_rounded, Colors.purple, () => _pickVideo()),
                 _buildActionIcon(Icons.emoji_emotions, Colors.orange, () => _showCategoryPicker(isDark, theme)),
               ],
             ),
@@ -438,7 +439,7 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
 
   Future<void> _pickMedia(ImageSource source) async {
     final picker = ImagePicker();
-    final XFile? file = await picker.pickImage(source: source, imageQuality: 80);
+    final XFile? file = await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1080);
       
     if (file == null) return;
 
@@ -454,14 +455,66 @@ class _CreateDareScreenState extends State<CreateDareScreen> {
       if (response.statusCode == 200 && data['success']) {
         setState(() {
           _mediaUrl = data['data']['mediaUrl'];
-          _mediaType = data['data']['mediaType'];
+          _mediaType = data['data']['mediaType'] ?? 'image';
           _isMediaUploading = false;
         });
       } else {
         setState(() => _isMediaUploading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload media')),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isMediaUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection error while uploading')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 2),
+    );
+      
+    if (file == null) return;
+
+    setState(() {
+      _selectedMedia = File(file.path);
+      _isMediaUploading = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final response = await apiService.uploadFile('/dares/upload-media', file.path, 'media');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        setState(() {
+          _mediaUrl = data['data']['mediaUrl'];
+          _mediaType = data['data']['mediaType'] ?? 'video';
+          _isMediaUploading = false;
+        });
+      } else {
+        setState(() => _isMediaUploading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload video')),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isMediaUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection error while uploading')),
+        );
+      }
     }
   }
 

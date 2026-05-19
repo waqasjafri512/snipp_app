@@ -34,18 +34,20 @@ class _HomeScreenState extends State<HomeScreen> {
     NotificationService().updateToken();
   }
 
-  final List<Widget> _screens = [
-    const FeedScreen(),
-    const SearchScreen(),
-    const SizedBox.shrink(), // Placeholder for center button
-    const ChatListScreen(),
-    const ProfileScreen(isTab: true),
-  ];
+
+
+  final Set<int> _loadedTabs = {0};
 
   void _onItemTapped(int index) {
     if (index == 2) {
       Navigator.pushNamed(context, AppConstants.createDareRoute);
       return;
+    }
+    
+    if (!_loadedTabs.contains(index)) {
+      setState(() {
+        _loadedTabs.add(index);
+      });
     }
     
     if (index == 1) {
@@ -98,7 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Main Content
                 IndexedStack(
                   index: _selectedIndex,
-                  children: _screens,
+                  children: [
+                    const FeedScreen(),
+                    _loadedTabs.contains(1) ? const SearchScreen() : const SizedBox.shrink(),
+                    const SizedBox.shrink(), // Center button placeholder
+                    _loadedTabs.contains(3) ? const ChatListScreen() : const SizedBox.shrink(),
+                    _loadedTabs.contains(4) ? const ProfileScreen(isTab: true) : const SizedBox.shrink(),
+                  ],
                 ),
                 
                 // Verification Banner as Overlay

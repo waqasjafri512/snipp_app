@@ -15,6 +15,7 @@ import '../../core/constants/app_constants.dart';
 import '../widgets/staggered_animation.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/dare_card.dart';
+import '../widgets/error_widgets.dart';
 import 'dare_detail_screen.dart';
 import 'story_viewer_screen.dart';
 import 'viewer_screen.dart';
@@ -30,6 +31,7 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
+  bool _isLoadingMore = false;
 
 
   @override
@@ -41,6 +43,8 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _loadFeed() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _currentPage = 1;
+      _isLoadingMore = false;
       Provider.of<DareProvider>(context, listen: false).fetchFeed(page: 1);
       Provider.of<LiveProvider>(context, listen: false).fetchActiveStreams();
       await Provider.of<StoryProvider>(context, listen: false).fetchStories();
@@ -93,7 +97,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
     if (source == null) return;
 
-    final file = await picker.pickImage(source: source, imageQuality: 80);
+    final file = await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1080);
     
     if (file != null && mounted) {
       final success = await Provider.of<StoryProvider>(context, listen: false).uploadStory(file.path);
@@ -106,9 +110,13 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_isLoadingMore) return;
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _isLoadingMore = true;
       _currentPage++;
-      Provider.of<DareProvider>(context, listen: false).fetchFeed(page: _currentPage);
+      Provider.of<DareProvider>(context, listen: false).fetchFeed(page: _currentPage).then((_) {
+        _isLoadingMore = false;
+      });
     }
   }
 
@@ -235,16 +243,26 @@ class _FeedScreenState extends State<FeedScreen> {
                         );
                       }
 
-                      if (dareProv.feedDares.isEmpty) {
+                      if (dareProv.error != null && dareProv.feedDares.isEmpty) {
                         return SliverFillRemaining(
                           child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text('No dares yet. Create one!'),
-                                TextButton(onPressed: _loadFeed, child: const Text('Refresh')),
-                              ],
+                            child: ErrorBanner(
+                              message: dareProv.error!,
+                              isOffline: dareProv.error == 'Connection error',
+                              onRetry: _loadFeed,
                             ),
+                          ),
+                        );
+                      }
+
+                      if (dareProv.feedDares.isEmpty) {
+                        return SliverFillRemaining(
+                          child: EmptyStateWidget(
+                            icon: Icons.explore_rounded,
+                            title: 'No dares in your feed yet',
+                            subtitle: 'Follow people or create your first dare\nto get the party started! 🎉',
+                            actionLabel: 'Create a Dare',
+                            onAction: () => Navigator.pushNamed(context, AppConstants.createDareRoute),
                           ),
                         );
                       }

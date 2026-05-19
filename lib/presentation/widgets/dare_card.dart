@@ -1,5 +1,7 @@
 import 'dart:ui' as ui;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/dare_provider.dart';
@@ -264,13 +266,18 @@ class DareCard extends StatelessWidget {
 
               // 3. Media Content
               if (hasMedia)
-                GestureDetector(
+                _DoubleTapLikeWrapper(
                   onDoubleTap: () => _handleLike(context),
-                  child: Image.network(
-                    AppConstants.getMediaUrl(dare['media_url']),
+                  child: CachedNetworkImage(
+                    imageUrl: AppConstants.getMediaUrl(dare['media_url']),
                     fit: BoxFit.contain,
                     width: double.infinity,
-                    errorBuilder: (context, error, stackTrace) => Container(
+                    placeholder: (context, url) => Container(
+                      height: 250,
+                      color: isDark ? Colors.white10 : Colors.grey[200],
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryStart)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       height: 200,
                       color: isDark ? Colors.white10 : Colors.grey[200],
                       child: const Center(child: Icon(Icons.error_outline)),
@@ -282,7 +289,14 @@ class DareCard extends StatelessWidget {
                 Container(
                   height: 250,
                   decoration: BoxDecoration(
-                    gradient: theme.gradient.withOpacity(0.1) as Gradient,
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.primaryStart.withOpacity(0.1),
+                        theme.primaryEnd.withOpacity(0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
                   ),
                   alignment: Alignment.center,
@@ -456,14 +470,10 @@ class DareCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: _buildFBActionButton(
-                        icon: Icons.reply_rounded, // Best fit for Share in Material Icons
+                        icon: Icons.reply_rounded,
                         label: 'Share',
                         color: isDark ? Colors.white70 : Colors.grey[700]!,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Share functionality coming soon! 🚀')),
-                          );
-                        },
+                        onTap: () => _handleShare(context),
                       ),
                     ),
                   ],
@@ -570,6 +580,22 @@ class DareCard extends StatelessWidget {
     Provider.of<DareProvider>(context, listen: false).toggleLike(dare['id']);
   }
 
+  void _handleShare(BuildContext context) {
+    final String title = dare['title'] ?? 'Check out this dare!';
+    final String description = dare['description'] ?? '';
+    final String creatorName = dare['creator_full_name'] ?? dare['creator_username'] ?? 'Someone';
+    final String dareId = dare['id'].toString();
+    
+    String shareText = '🔥 $creatorName shared a dare on Snipp!\n\n';
+    if (title.isNotEmpty) shareText += '\"$title\"\n';
+    if (description.isNotEmpty && description != title) shareText += '$description\n';
+    shareText += '\nCheck it out on Snipp! 👉 https://snipp.app/dare/$dareId';
+    
+    SharePlus.instance.share(
+      ShareParams(text: shareText),
+    );
+  }
+
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
       context: context,
@@ -617,6 +643,93 @@ class DareCard extends StatelessWidget {
     } catch (e) {
       return '';
     }
+  }
+}
+
+/// Widget that shows a heart animation overlay on double-tap (Instagram-style).
+class _DoubleTapLikeWrapper extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onDoubleTap;
+
+  const _DoubleTapLikeWrapper({required this.child, required this.onDoubleTap});
+
+  @override
+  State<_DoubleTapLikeWrapper> createState() => _DoubleTapLikeWrapperState();
+}
+
+class _DoubleTapLikeWrapperState extends State<_DoubleTapLikeWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+  bool _showHeart = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.4).chain(CurveTween(curve: Curves.easeOut)), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 20),
+    ]).animate(_controller);
+    _opacityAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 30),
+    ]).animate(_controller);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() => _showHeart = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onDoubleTap: () {
+        widget.onDoubleTap();
+        setState(() => _showHeart = true);
+        _controller.forward(from: 0.0);
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          widget.child,
+          if (_showHeart)
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _opacityAnimation.value,
+                  child: Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      color: Colors.white,
+                      size: 80,
+                      shadows: [
+                        Shadow(color: Colors.black38, blurRadius: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
   }
 }
 

@@ -19,6 +19,7 @@ class AppConstants {
   static const String chatDetailRoute = '/chat-detail';
   static const String searchRoute = '/search';
   static const String notificationsRoute = '/notifications';
+  static const String onboardingRoute = '/onboarding';
   
   static String getMediaUrl(String? path) {
     if (path == null || path.isEmpty) return '';

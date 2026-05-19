@@ -11,13 +11,28 @@ class SocketService {
   StreamController<Map<String, dynamic>> _eventController =
       StreamController<Map<String, dynamic>>.broadcast();
   int? _currentUserId;
+  bool _isConnecting = false;
 
   Stream<Map<String, dynamic>> get eventStream => _eventController.stream;
   bool get isConnected => _socket != null && _socket!.connected;
 
   void connect(int userId) {
-    if (_socket != null && _socket!.connected) return;
+    // Guard: prevent double-connect race conditions
+    if (_isConnecting) return;
+    if (_socket != null && _socket!.connected && _currentUserId == userId) return;
+
+    // If reconnecting as a different user, disconnect first
+    if (_socket != null && _currentUserId != null && _currentUserId != userId) {
+      disconnect();
+    }
+
+    _isConnecting = true;
     _currentUserId = userId;
+
+    // Ensure the stream controller is open
+    if (_eventController.isClosed) {
+      _eventController = StreamController<Map<String, dynamic>>.broadcast();
+    }
 
     _socket = IO.io(AppConstants.apiUrl.replaceAll('/api', ''), <String, dynamic>{
       'transports': ['websocket'],
@@ -32,11 +47,16 @@ class SocketService {
     _socket!.connect();
 
     _socket!.onConnect((_) {
+      _isConnecting = false;
       print('✅ Socket connected: ${_socket!.id}');
       _socket!.emit('join', userId);
     });
 
-    _socket!.onConnectError((data) => print('❌ Socket Connect Error: $data'));
+    _socket!.onConnectError((data) {
+      _isConnecting = false;
+      print('❌ Socket Connect Error: $data');
+    });
+    
     _socket!.onError((data) => print('❌ Socket Error: $data'));
 
     // Universal message handler
@@ -89,7 +109,9 @@ class SocketService {
   }
 
   void disconnect() {
-    // Don't close or replace the controller as it's used by long-lived providers
+    _isConnecting = false;
+    // Don't close the broadcast controller — long-lived providers depend on it.
+    // Just disconnect the socket itself.
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
