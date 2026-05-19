@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/repositories/api_service.dart';
 import '../../data/services/socket_service.dart';
+import '../../data/services/cache_service.dart';
 
 class DareProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -20,6 +21,7 @@ class DareProvider with ChangeNotifier {
         final exists = _feedDares.any((d) => d['id'].toString() == newDare['id'].toString());
         if (!exists) {
           _feedDares.insert(0, newDare);
+          CacheService().cacheFeed(_feedDares);
           notifyListeners();
         }
       } else if (event['event'] == 'dareUpdated') {
@@ -27,6 +29,7 @@ class DareProvider with ChangeNotifier {
         final index = _feedDares.indexWhere((d) => d['id'] == updatedDare['id']);
         if (index != -1) {
           _feedDares[index] = updatedDare;
+          CacheService().cacheFeed(_feedDares);
           notifyListeners();
         }
       } else if (event['event'] == 'newComment') {
@@ -46,11 +49,13 @@ class DareProvider with ChangeNotifier {
         final feedIndex = _feedDares.indexWhere((d) => d['id'].toString() == dareId.toString());
         if (feedIndex != -1) {
           _feedDares[feedIndex]['comments_count'] = (_feedDares[feedIndex]['comments_count'] ?? 0) + 1;
+          CacheService().cacheFeed(_feedDares);
         }
         notifyListeners();
       } else if (event['event'] == 'dareDeleted') {
         final dareId = event['data'];
         _feedDares.removeWhere((d) => d['id'] == dareId);
+        CacheService().cacheFeed(_feedDares);
         notifyListeners();
       }
     });
@@ -79,7 +84,15 @@ class DareProvider with ChangeNotifier {
 
   // Fetch Feed
   Future<void> fetchFeed({int page = 1}) async {
-    if (page == 1) _setLoading(true);
+    if (page == 1) {
+      _isLoading = true;
+      // Load offline cache instantly before hitting the API
+      final cached = CacheService().getCachedFeed();
+      if (cached.isNotEmpty && _feedDares.isEmpty) {
+        _feedDares = List<dynamic>.from(cached);
+      }
+      notifyListeners();
+    }
     _error = null;
     try {
       final response = await _apiService.get('/dares/feed?page=$page');
@@ -88,6 +101,8 @@ class DareProvider with ChangeNotifier {
       if (response.statusCode == 200 && data['success']) {
         if (page == 1) {
           _feedDares = data['data']['dares'];
+          // Save to Hive cache
+          CacheService().cacheFeed(_feedDares);
         } else {
           _feedDares.addAll(data['data']['dares']);
         }
@@ -97,7 +112,7 @@ class DareProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Connection error';
     } finally {
-      if (page == 1) _setLoading(false);
+      if (page == 1) _isLoading = false;
       notifyListeners();
     }
   }
