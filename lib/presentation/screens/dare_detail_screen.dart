@@ -86,379 +86,389 @@ class _DareDetailScreenState extends State<DareDetailScreen> {
         final theme = themeProv.currentTheme;
         final isDark = themeProv.currentThemeIndex == 1;
 
-        return Scaffold(
-          backgroundColor: theme.background,
-          body: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Header Area
-                Stack(
+        return Consumer<DareProvider>(
+          builder: (context, dareProv, _) {
+            // Retrieve latest dare from the provider feed to ensure reactive updates (likes, accepts, comments)
+            final latestDare = dareProv.feedDares.firstWhere(
+              (d) => d['id'].toString() == dare['id'].toString(),
+              orElse: () => dare,
+            );
+
+            return Scaffold(
+              backgroundColor: theme.background,
+              body: SingleChildScrollView(
+                child: Column(
                   children: [
-                    Container(
-                      height: 300,
-                      decoration: BoxDecoration(
-                        gradient: (dare['media_url'] == null) ? _getGradient(dare['id'] ?? 0) : null,
-                        color: (dare['media_url'] == null) ? null : Colors.black,
-                        image: dare['media_url'] != null
-                            ? DecorationImage(
-                                image: NetworkImage(AppConstants.getMediaUrl(dare['media_url'])),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      alignment: Alignment.center,
-                      child: dare['media_url'] == null
-                          ? Text(
-                              dare['emoji'] ?? '⚡',
-                              style: const TextStyle(fontSize: 90),
-                            )
-                          : null,
-                    ),
-                    // Back Button
-                    Positioned(
-                      top: 54,
-                      left: 14,
-                      child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          width: 40,
-                          height: 40,
+                    // Header Area
+                    Stack(
+                      children: [
+                        Container(
+                          height: 300,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                            gradient: (latestDare['media_url'] == null) ? _getGradient(latestDare['id'] ?? 0) : null,
+                            color: (latestDare['media_url'] == null) ? null : Colors.black,
+                            image: latestDare['media_url'] != null
+                                ? DecorationImage(
+                                    image: NetworkImage(AppConstants.getMediaUrl(latestDare['media_url'])),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
                           ),
                           alignment: Alignment.center,
-                          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                          child: latestDare['media_url'] == null
+                              ? Text(
+                                  latestDare['emoji'] ?? '⚡',
+                                  style: const TextStyle(fontSize: 90),
+                                )
+                              : null,
                         ),
-                      ),
-                    ),
-                    // Bottom Gradient Overlay to transition to BG
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        height: 80,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, theme.background],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // User Info
-                      Row(
-                        children: [
-                          _buildAvatar(dare),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  dare['creator_name'] ?? dare['creator_username'] ?? 'User',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    color: theme.textMain,
-                                  ),
-                                ),
-                                Text(
-                                  '${dare['creator_followers_count'] ?? 0} followers · ${_getTimeAgo(dare['created_at'])}',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    color: isDark ? Colors.white54 : AppColors.muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          _buildOutlineButton('Follow', theme, isDark),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Title & Description
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          gradient: theme.gradient,
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          dare['category'] ?? '🔥 Trending',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        dare['title'] ?? 'Untitled Dare',
-                        style: GoogleFonts.bricolageGrotesque(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: theme.textMain,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        dare['description'] ?? "No description provided.",
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          color: isDark ? Colors.white54 : AppColors.muted,
-                          height: 1.65,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Stats Card
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: isDark ? null : [
-                            BoxShadow(
-                              color: theme.primaryStart.withOpacity(0.08),
-                              blurRadius: 14,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            _buildStatItem(Icons.favorite_rounded, (dare['likes_count'] ?? 0).toString(), 'Likes', theme, isDark, iconColor: const Color(0xFFEF4444)),
-                            _buildStatItem(Icons.chat_bubble_rounded, (dare['comments_count'] ?? 0).toString(), 'Comments', theme, isDark, iconColor: const Color(0xFF0EA5E9)),
-                            _buildStatItem(Icons.check_circle_rounded, (dare['accepts_count'] ?? 0).toString(), 'Accepts', theme, isDark, iconColor: const Color(0xFF10B981)),
-                            _buildStatItem(Icons.share_rounded, (dare['shares_count'] ?? 0).toString(), 'Shares', theme, isDark, isLast: true, iconColor: const Color(0xFF7C3AED)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Accept Button (Only for Dares)
-                      if (dare['post_type'] != 'general')
-                        Consumer<DareProvider>(
-                          builder: (context, dareProv, _) {
-                            bool isAccepted = dare['is_accepted'] == true || dareProv.userParticipatedDares.any((d) => d['id'] == dare['id']);
-                            
-                            return GradientButton(
-                              text: isAccepted ? '🎯 Already Accepted' : '🎯 Accept This Dare',
-                              onPressed: isAccepted ? null : () async {
-                                final success = await dareProv.acceptDare(dare['id']);
-                                if (success && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Dare Accepted! Going Live... 🔥')),
-                                  );
-                                  
-                                  // Navigate to Live directly
-                                  Navigator.pushNamed(
-                                    context, 
-                                    '/broadcaster', 
-                                    arguments: {
-                                      'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
-                                      'title': 'Performing: ${dare['title']}',
-                                      'dareId': dare['id'],
-                                    }
-                                  );
-                                }
-                              },
-                              borderRadius: 20,
-                              height: 64,
-                              opacity: isAccepted ? 0.7 : 1.0,
-                            );
-                          },
-                        ),
-                      if (dare['post_type'] != 'general')
-                        const SizedBox(height: 16),
-
-                      // Upload Proof Section (Only for Dares)
-                      if (dare['post_type'] != 'general')
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? theme.primaryStart.withOpacity(0.1) : const Color(0xFFFAF9FF),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: theme.primaryStart.withOpacity(0.2),
-                              width: 2,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Already completed it?',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                  color: theme.primaryStart,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Upload your video proof and claim credit',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.white54 : AppColors.muted,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildFullWidthOutlineButton(
-                                'Upload Completion Video',
-                                theme,
-                                isDark,
-                                onTap: () => _uploadProof(context, theme),
-                              ),
-                              const SizedBox(height: 10),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(
-                                    context, 
-                                    '/broadcaster', 
-                                    arguments: {
-                                      'channelName': 'dare_perf_${dare['id']}_${DateTime.now().millisecondsSinceEpoch}',
-                                      'title': 'Performing: ${dare['title']}',
-                                    }
-                                  );
-                                },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: isDark ? null : [
-                                      BoxShadow(
-                                        color: const Color(0xFFFF006E).withOpacity(0.3),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.sensors_rounded, color: Colors.white, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Perform Dare Live',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (dare['post_type'] != 'general')
-                        const SizedBox(height: 24),
-                      // Comments Header
-                      Text(
-                        'Comments (${dare['comments_count'] ?? 0})',
-                        style: GoogleFonts.bricolageGrotesque(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 17,
-                          color: theme.textMain,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Comments List
-                      Consumer<DareProvider>(
-                        builder: (context, dareProv, _) {
-                          if (dareProv.comments.isEmpty) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 20),
-                              child: Center(
-                                child: Text(
-                                  'No comments yet. Be the first to say something!',
-                                  style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white54 : AppColors.muted),
-                                ),
-                              ),
-                            );
-                          }
-                          return Column(
-                            children: dareProv.comments.map((comment) {
-                              return _buildCommentItem(
-                                comment['username'] ?? 'user',
-                                comment['content'] ?? '',
-                                _getTimeAgo(comment['created_at']),
-                                comment['likes_count'] ?? 0,
-                                comment['id'] % 5,
-                                theme,
-                                isDark,
-                                avatarUrl: comment['avatar_url'],
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-
-                      // Add Comment
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _buildAvatarSmall(4, theme, isDark),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _commentController,
-                              style: TextStyle(color: theme.textMain),
-                              decoration: InputDecoration(
-                                hintText: 'Add a comment...',
-                                hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.grey),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                                filled: true,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          GestureDetector(
-                            onTap: _handleSendComment,
+                        // Back Button
+                        Positioned(
+                          top: 54,
+                          left: 14,
+                          child: GestureDetector(
+                            onTap: () => Navigator.pop(context),
                             child: Container(
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                gradient: theme.gradient,
-                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(13),
+                                border: Border.all(color: Colors.white.withOpacity(0.3)),
                               ),
                               alignment: Alignment.center,
-                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
                             ),
                           ),
+                        ),
+                        // Bottom Gradient Overlay to transition to BG
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 80,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Colors.transparent, theme.background],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // User Info
+                          Row(
+                            children: [
+                              _buildAvatar(latestDare),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      latestDare['creator_name'] ?? latestDare['creator_username'] ?? 'User',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: theme.textMain,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${latestDare['creator_followers_count'] ?? 0} followers · ${_getTimeAgo(latestDare['created_at'])}',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.white54 : AppColors.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _buildOutlineButton('Follow', theme, isDark),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Title & Description
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: theme.gradient,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              latestDare['category'] ?? '🔥 Trending',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            latestDare['title'] ?? 'Untitled Dare',
+                            style: GoogleFonts.bricolageGrotesque(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: theme.textMain,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            latestDare['description'] ?? "No description provided.",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              color: isDark ? Colors.white54 : AppColors.muted,
+                              height: 1.65,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Stats Card
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: isDark ? null : [
+                                BoxShadow(
+                                  color: theme.primaryStart.withOpacity(0.08),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                _buildStatItem(Icons.favorite_rounded, (latestDare['likes_count'] ?? 0).toString(), 'Likes', theme, isDark, iconColor: const Color(0xFFEF4444)),
+                                _buildStatItem(Icons.chat_bubble_rounded, (latestDare['comments_count'] ?? 0).toString(), 'Comments', theme, isDark, iconColor: const Color(0xFF0EA5E9)),
+                                _buildStatItem(Icons.check_circle_rounded, (latestDare['accepts_count'] ?? 0).toString(), 'Accepts', theme, isDark, iconColor: const Color(0xFF10B981)),
+                                _buildStatItem(Icons.share_rounded, (latestDare['shares_count'] ?? 0).toString(), 'Shares', theme, isDark, isLast: true, iconColor: const Color(0xFF7C3AED)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Accept Button (Only for Dares)
+                          if (latestDare['post_type'] != 'general')
+                            Builder(
+                              builder: (context) {
+                                bool isAccepted = latestDare['is_accepted'] == true || dareProv.userParticipatedDares.any((d) => d['id'] == latestDare['id']);
+                                
+                                return GradientButton(
+                                  text: isAccepted ? '🎯 Already Accepted' : '🎯 Accept This Dare',
+                                  onPressed: isAccepted ? null : () async {
+                                    final success = await dareProv.acceptDare(latestDare['id']);
+                                    if (success && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Dare Accepted! Going Live... 🔥')),
+                                      );
+                                      
+                                      // Navigate to Live directly
+                                      Navigator.pushNamed(
+                                        context, 
+                                        '/broadcaster', 
+                                        arguments: {
+                                          'channelName': 'dare_perf_${latestDare['id']}_${DateTime.now().millisecondsSinceEpoch}',
+                                          'title': 'Performing: ${latestDare['title']}',
+                                          'dareId': latestDare['id'],
+                                        }
+                                      );
+                                    }
+                                  },
+                                  borderRadius: 20,
+                                  height: 64,
+                                  opacity: isAccepted ? 0.7 : 1.0,
+                                );
+                              },
+                            ),
+                          if (latestDare['post_type'] != 'general')
+                            const SizedBox(height: 16),
+
+                          // Upload Proof Section (Only for Dares)
+                          if (latestDare['post_type'] != 'general')
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isDark ? theme.primaryStart.withOpacity(0.1) : const Color(0xFFFAF9FF),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: theme.primaryStart.withOpacity(0.2),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Already completed it?',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: theme.primaryStart,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Upload your video proof and claim credit',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      color: isDark ? Colors.white54 : AppColors.muted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildFullWidthOutlineButton(
+                                    'Upload Completion Video',
+                                    theme,
+                                    isDark,
+                                    onTap: () => _uploadProof(context, theme),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.pushNamed(
+                                        context, 
+                                        '/broadcaster', 
+                                        arguments: {
+                                          'channelName': 'dare_perf_${latestDare['id']}_${DateTime.now().millisecondsSinceEpoch}',
+                                          'title': 'Performing: ${latestDare['title']}',
+                                        }
+                                      );
+                                    },
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(colors: [Color(0xFFFF006E), Color(0xFFFB5607)]),
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: isDark ? null : [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF006E).withOpacity(0.3),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.sensors_rounded, color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Perform Dare Live',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (latestDare['post_type'] != 'general')
+                            const SizedBox(height: 24),
+                          // Comments Header
+                          Text(
+                            'Comments (${latestDare['comments_count'] ?? 0})',
+                            style: GoogleFonts.bricolageGrotesque(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 17,
+                              color: theme.textMain,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Comments List
+                          Builder(
+                            builder: (context) {
+                              if (dareProv.comments.isEmpty) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 20),
+                                  child: Center(
+                                    child: Text(
+                                      'No comments yet. Be the first to say something!',
+                                      style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white54 : AppColors.muted),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Column(
+                                children: dareProv.comments.map((comment) {
+                                  return _buildCommentItem(
+                                    comment['username'] ?? 'user',
+                                    comment['content'] ?? '',
+                                    _getTimeAgo(comment['created_at']),
+                                    comment['likes_count'] ?? 0,
+                                    comment['id'] % 5,
+                                    theme,
+                                    isDark,
+                                    avatarUrl: comment['avatar_url'],
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+
+                          // Add Comment
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              _buildAvatarSmall(4, theme, isDark),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _commentController,
+                                  style: TextStyle(color: theme.textMain),
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a comment...',
+                                    hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.grey),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                                    filled: true,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: _handleSendComment,
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: theme.gradient,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 40),
                         ],
                       ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

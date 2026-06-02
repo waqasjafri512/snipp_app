@@ -119,7 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 left: 20,
                 right: 20,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Dot Indicators
                     Row(
