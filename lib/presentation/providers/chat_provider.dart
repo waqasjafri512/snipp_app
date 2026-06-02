@@ -138,6 +138,7 @@ class ChatProvider with ChangeNotifier {
       // Update existing conversation in-memory
       _conversations[idx]['last_message'] = message['content'];
       _conversations[idx]['last_message_at'] = message['created_at'];
+      _conversations[idx]['last_message_time'] = message['created_at'];
       if (senderId != _currentUserId && _activeChatUserId != otherId) {
         _conversations[idx]['unread_count'] = (_conversations[idx]['unread_count'] ?? 0) + 1;
       }
@@ -220,8 +221,62 @@ class ChatProvider with ChangeNotifier {
     return count;
   }
 
-  // Send Message
+  // Send Message via REST API (reliable on Vercel) with optimistic UI
   void sendMessage(int senderId, int receiverId, String content, {String type = 'text', String? mediaUrl}) {
+    _currentUserId ??= senderId;
+    // 1. Optimistic: insert a local placeholder message immediately
+    final optimisticId = -DateTime.now().millisecondsSinceEpoch; // negative to avoid collision with real IDs
+    final optimisticMessage = {
+      'id': optimisticId,
+      'sender_id': senderId,
+      'receiver_id': receiverId,
+      'content': content,
+      'type': type,
+      'media_url': mediaUrl,
+      'is_read': false,
+      'created_at': DateTime.now().toIso8601String(),
+      '_sending': true, // local flag
+    };
+    _messages.insert(0, optimisticMessage);
+    _updateConversationsLocally(optimisticMessage);
+    notifyListeners();
+
+    // 2. Send via REST API
+    _apiService.post('/messages/send', {
+      'receiverId': receiverId,
+      'content': content,
+      'type': type,
+      'mediaUrl': mediaUrl,
+    }).then((response) {
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success']) {
+        // Replace optimistic message with real server message
+        final serverMessage = data['data']['message'];
+        final idx = _messages.indexWhere((m) => m['id'] == optimisticId);
+        if (idx != -1) {
+          _messages[idx] = serverMessage;
+          notifyListeners();
+        }
+      } else {
+        // Mark as failed
+        final idx = _messages.indexWhere((m) => m['id'] == optimisticId);
+        if (idx != -1) {
+          _messages[idx]['_sending'] = false;
+          _messages[idx]['_failed'] = true;
+          notifyListeners();
+        }
+      }
+    }).catchError((e) {
+      print('Send message REST error: $e');
+      final idx = _messages.indexWhere((m) => m['id'] == optimisticId);
+      if (idx != -1) {
+        _messages[idx]['_sending'] = false;
+        _messages[idx]['_failed'] = true;
+        notifyListeners();
+      }
+    });
+
+    // 3. Also try socket (works when running local backend, no-op on Vercel)
     SocketService().emit('sendMessage', {
       'senderId': senderId,
       'receiverId': receiverId,
